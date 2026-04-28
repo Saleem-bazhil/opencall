@@ -1,0 +1,152 @@
+import type {
+  CallPlanParsedRecord,
+  FlexWipParsedRecord,
+  ParsedSourceFile,
+  RenderwaysParsedRecord,
+} from "../../types/sourceRecords.js";
+import {
+  cleanString,
+  normalizeCaseId,
+  normalizePincode,
+  normalizeTicketId,
+  parseExcelDate,
+} from "../normalization/valueNormalizer.js";
+import { readExcelSheet } from "./excelWorkbookReader.js";
+import { findDuplicates } from "./duplicateDetector.js";
+import { getCell } from "./rowAccess.js";
+
+function buildParsedSourceFile<TRecord extends { normalizedTicketId?: string | null; normalizedCaseId?: string | null }>(
+  records: TRecord[],
+  issues: ParsedSourceFile<TRecord>["issues"],
+): ParsedSourceFile<TRecord> {
+  return {
+    records,
+    issues,
+    duplicateNormalizedTicketIds: findDuplicates(
+      records.map((record) => record.normalizedTicketId ?? null),
+    ),
+    duplicateNormalizedCaseIds: findDuplicates(
+      records.map((record) => record.normalizedCaseId ?? null),
+    ),
+  };
+}
+
+export function parseFlexWipReport(
+  filePath: string,
+): ParsedSourceFile<FlexWipParsedRecord> {
+  const sheet = readExcelSheet(filePath, "FLEX_WIP");
+  const records: FlexWipParsedRecord[] = [];
+  const issues: ParsedSourceFile<FlexWipParsedRecord>["issues"] = [];
+
+  for (const row of sheet.rows) {
+    const ticketId = cleanString(getCell(row.values, ["Ticket ID", "TicketId", "Ticket No"]));
+    const normalizedTicketId = normalizeTicketId(ticketId);
+    const caseId = cleanString(getCell(row.values, ["Case ID", "CaseId", "Case No"]));
+    const normalizedCaseId = caseId ? normalizeCaseId(caseId) : null;
+
+    if (!ticketId || !normalizedTicketId) {
+      issues.push({
+        rowNumber: row.rowNumber,
+        field: "Ticket ID",
+        message: "Flex WIP row is missing Ticket ID",
+      });
+      continue;
+    }
+
+    records.push({
+      ticketId,
+      normalizedTicketId,
+      caseId,
+      normalizedCaseId,
+      product: cleanString(getCell(row.values, ["Product", "Product Name"])),
+      flexStatus: cleanString(getCell(row.values, ["Status", "Flex Status"])),
+      woOtcCode: cleanString(getCell(row.values, ["WO OTC Code", "WO OTC CODE", "WO-OTC Code"])),
+      accountName: cleanString(getCell(row.values, ["Account Name"])),
+      customerName: cleanString(getCell(row.values, ["Customer Name"])),
+      contact: cleanString(getCell(row.values, ["Contact", "Contact Number", "Phone"])),
+      customerEmail: cleanString(getCell(row.values, ["Customer Email", "Customer Mail", "Email"])),
+      partDescription: cleanString(getCell(row.values, ["Part Description", "Part"])),
+      customerPincode: normalizePincode(getCell(row.values, ["Customer Pincode", "Pincode", "Pin Code"])),
+      rawRow: row.rawRow,
+      rowNumber: row.rowNumber,
+    });
+  }
+
+  return buildParsedSourceFile(records, issues);
+}
+
+export function parseRenderwaysReport(
+  filePath: string,
+): ParsedSourceFile<RenderwaysParsedRecord> {
+  const sheet = readExcelSheet(filePath, "RENDERWAYS");
+  const records: RenderwaysParsedRecord[] = [];
+  const issues: ParsedSourceFile<RenderwaysParsedRecord>["issues"] = [];
+
+  for (const row of sheet.rows) {
+    const ticketId = cleanString(getCell(row.values, ["Ticket ID", "TicketId", "Ticket No"]));
+    const normalizedTicketId = ticketId ? normalizeTicketId(ticketId) : null;
+    const caseId = cleanString(getCell(row.values, ["Case ID", "CaseId", "Case No"]));
+    const normalizedCaseId = normalizeCaseId(caseId);
+
+    if (!caseId || !normalizedCaseId) {
+      issues.push({
+        rowNumber: row.rowNumber,
+        field: "Case ID",
+        message: "Renderways row is missing Case ID",
+      });
+      continue;
+    }
+
+    records.push({
+      ticketId,
+      normalizedTicketId,
+      caseId,
+      normalizedCaseId,
+      partnerAccept: parseExcelDate(getCell(row.values, ["Partner Accept", "Partner Accepted", "Case Created Time"])),
+      wipAging: cleanString(getCell(row.values, ["WIP Aging", "WIP aging"])),
+      wipAgingCategory: cleanString(getCell(row.values, ["WIP Aging Category"])),
+      hpOwner: cleanString(getCell(row.values, ["HP Owner", "HP Owner Status"])),
+      rcaMessage: cleanString(getCell(row.values, ["RCA Message", "RCA"])),
+      productType: cleanString(getCell(row.values, ["Product Type"])),
+      callClassification: cleanString(getCell(row.values, ["Call Classification"])),
+      rawRow: row.rawRow,
+      rowNumber: row.rowNumber,
+    });
+  }
+
+  return buildParsedSourceFile(records, issues);
+}
+
+export function parseCallPlanReport(
+  filePath: string,
+): ParsedSourceFile<CallPlanParsedRecord> {
+  const sheet = readExcelSheet(filePath, "CALL_PLAN");
+  const records: CallPlanParsedRecord[] = [];
+  const issues: ParsedSourceFile<CallPlanParsedRecord>["issues"] = [];
+
+  for (const row of sheet.rows) {
+    const ticketId = cleanString(getCell(row.values, ["Ticket ID", "TicketId", "Ticket No"]));
+    const normalizedTicketId = normalizeTicketId(ticketId);
+
+    if (!ticketId || !normalizedTicketId) {
+      issues.push({
+        rowNumber: row.rowNumber,
+        field: "Ticket ID",
+        message: "Call Plan row is missing Ticket ID",
+      });
+      continue;
+    }
+
+    records.push({
+      ticketId,
+      normalizedTicketId,
+      morningStatus: cleanString(getCell(row.values, ["Morning Status", "RTPL Status"])),
+      engineer: cleanString(getCell(row.values, ["Engineer", "engg.","Engg.", "engg", "Engineer Name"])),
+      location: cleanString(getCell(row.values, ["Location", "Location Name"])),
+      rawRow: row.rawRow,
+      rowNumber: row.rowNumber,
+    });
+  }
+
+  return buildParsedSourceFile(records, issues);
+}

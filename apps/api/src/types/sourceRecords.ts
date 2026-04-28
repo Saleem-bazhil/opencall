@@ -1,0 +1,64 @@
+export interface ParsedRowIssue {
+  rowNumber: number;
+  field: string;
+  message: string;
+}
+
+export interface ParsedSourceFile<TRecord> {
+  records: TRecord[];
+  issues: ParsedRowIssue[];
+  duplicateNormalizedTicketIds: string[];
+  duplicateNormalizedCaseIds: string[];
+}
+
+export interface FlexWipParsedRecord {
+  id?: string;
+  ticketId: string;
+  normalizedTicketId: string;
+  caseId: string | null;
+  normalizedCaseId: string | null;
+  product: string | null;
+  flexStatus: string | null;
+  woOtcCode: string | null;
+  accountName: string | null;
+  customerName: string | null;
+  contact: string | null;
+  customerEmail: string | null;
+  partDescription: string | null;
+  customerPincode: string | null;
+  rawRow: Record<string, unknown>;
+  rowNumber: number;
+}
+
+export interface RenderwaysParsedRecord {
+  id?: string;
+  ticketId: string | null;
+  normalizedTicketId: string | null;
+  caseId: string;
+  normalizedCaseId: string;
+  partnerAccept: Date | null;
+  wipAging: string | null;
+  wipAgingCategory: string | null;
+  hpOwner: string | null;
+  rcaMessage: string | null;
+  productType: string | null;
+  callClassification: string | null;
+  rawRow: Record<string, unknown>;
+  rowNumber: number;
+}
+
+export interface CallPlanParsedRecord {
+  id?: string;
+  ticketId: string;
+  normalizedTicketId: string;
+  morningStatus: string | null;
+  engineer: string | null;
+  location: string | null;
+  rawRow: Record<string, unknown>;
+  rowNumber: number;
+}
+
+export type ParsedSourceRecord =
+  | FlexWipParsedRecord
+  | RenderwaysParsedRecord
+  | CallPlanParsedRecord;

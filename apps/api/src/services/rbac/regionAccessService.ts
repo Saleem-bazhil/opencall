@@ -1,0 +1,59 @@
+import type { AuthenticatedUser } from "../../types/auth.js";
+import type { UploadBatchValidationRecord } from "../../repositories/uploadBatchRepository.js";
+import { forbidden } from "../../utils/httpError.js";
+
+export function requireCurrentUser(
+  user: AuthenticatedUser | undefined,
+): AuthenticatedUser {
+  if (!user) {
+    throw forbidden("Authenticated user context is missing");
+  }
+
+  return user;
+}
+
+export function resolveEffectiveRegionId(
+  user: AuthenticatedUser,
+  requestedRegionId: string | null | undefined,
+): string | null {
+  if (user.role === "SUPER_ADMIN") {
+    return requestedRegionId ?? null;
+  }
+
+  if (!user.regionId) {
+    throw forbidden("REGION_ADMIN user is not assigned to a region");
+  }
+
+  if (requestedRegionId && requestedRegionId !== user.regionId) {
+    throw forbidden("REGION_ADMIN cannot access another region", {
+      requestedRegionId,
+      userRegionId: user.regionId,
+    });
+  }
+
+  return user.regionId;
+}
+
+export function assertCanAccessBatchRegions(
+  user: AuthenticatedUser,
+  batches: readonly UploadBatchValidationRecord[],
+): void {
+  if (user.role === "SUPER_ADMIN") {
+    return;
+  }
+
+  if (!user.regionId) {
+    throw forbidden("REGION_ADMIN user is not assigned to a region");
+  }
+
+  const blockedBatches = batches.filter((batch) => {
+    return batch.regionId !== null && batch.regionId !== user.regionId;
+  });
+
+  if (blockedBatches.length > 0) {
+    throw forbidden("REGION_ADMIN cannot access upload batches from another region", {
+      blockedBatchIds: blockedBatches.map((batch) => batch.id),
+      userRegionId: user.regionId,
+    });
+  }
+}

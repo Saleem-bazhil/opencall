@@ -1,0 +1,17 @@
+{
+  "name": "opencall",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daily Call Plan Report generation system.",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm --filter @opencall/shared build && pnpm --filter @opencall/api build && pnpm --filter @opencall/web typecheck",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  }
+}
