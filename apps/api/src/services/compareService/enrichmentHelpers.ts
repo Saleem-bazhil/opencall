@@ -58,15 +58,15 @@ export function mapLocation(
   }
 
   if (!areaNameByPincode) {
-    return null;
+    return normalizedPincode;
   }
 
   if (isReadonlyMap(areaNameByPincode)) {
-    return areaNameByPincode.get(normalizedPincode) ?? null;
+    return areaNameByPincode.get(normalizedPincode) ?? normalizedPincode;
   }
 
   const areaByPincodeRecord = areaNameByPincode;
-  return areaByPincodeRecord[normalizedPincode] ?? null;
+  return areaByPincodeRecord[normalizedPincode] ?? normalizedPincode;
 }
 
 export function getLookupNumber(

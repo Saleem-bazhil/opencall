@@ -38,7 +38,8 @@ export async function findAreaNameByPincode(
     `
       SELECT pincode, area_name
       FROM pincode_area_mappings
-      WHERE region_id IS NULL
+      WHERE $1::uuid IS NULL
+         OR region_id IS NULL
          OR region_id = $1
       ORDER BY region_id NULLS LAST
     `,

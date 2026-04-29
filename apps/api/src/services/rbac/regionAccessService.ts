@@ -16,17 +16,19 @@ export function resolveEffectiveRegionId(
   user: AuthenticatedUser,
   requestedRegionId: string | null | undefined,
 ): string | null {
+  const normalizedRegionId = requestedRegionId?.trim() || null;
+
   if (user.role === "SUPER_ADMIN") {
-    return requestedRegionId ?? null;
+    return normalizedRegionId;
   }
 
   if (!user.regionId) {
     throw forbidden("REGION_ADMIN user is not assigned to a region");
   }
 
-  if (requestedRegionId && requestedRegionId !== user.regionId) {
+  if (normalizedRegionId && normalizedRegionId !== user.regionId) {
     throw forbidden("REGION_ADMIN cannot access another region", {
-      requestedRegionId,
+      requestedRegionId: normalizedRegionId,
       userRegionId: user.regionId,
     });
   }

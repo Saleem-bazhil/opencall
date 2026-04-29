@@ -62,12 +62,29 @@ function StatusPill({
 function Metric({
   label,
   value,
+  onClick,
+  isActive,
 }: Readonly<{
   label: string;
   value: string | number;
+  onClick?: () => void;
+  isActive?: boolean;
 }>) {
   return (
-    <div className="metric">
+    <div
+      className="metric"
+      onClick={onClick}
+      style={
+        onClick
+          ? {
+              cursor: "pointer",
+              borderColor: isActive ? "var(--accent)" : undefined,
+              background: isActive ? "var(--surface-subtle)" : undefined,
+            }
+          : undefined
+      }
+      role={onClick ? "button" : undefined}
+    >
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -88,6 +105,34 @@ export default function DashboardPage() {
     useState<RuntimeHealthResponse | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedPreviewCategory, setSelectedPreviewCategory] = useState<string | null>(null);
+
+  const selectedRecords = useMemo(() => {
+    if (!preview || !selectedPreviewCategory) return null;
+    const { enrichedRows } = preview;
+    switch (selectedPreviewCategory) {
+      case "Renderways":
+        return enrichedRows;
+      case "Flex matched":
+        return enrichedRows.filter(
+          (r) => r.match_status === "MATCHED" || r.match_status === "CALLPLAN_MISSING",
+        );
+      case "Call Plan matched":
+        return enrichedRows.filter(
+          (r) => r.match_status === "MATCHED" || r.match_status === "FLEX_MISSING",
+        );
+      case "Flex missing":
+        return enrichedRows.filter(
+          (r) => r.match_status === "FLEX_MISSING" || r.match_status === "BOTH_MISSING",
+        );
+      case "Call Plan missing":
+        return enrichedRows.filter(
+          (r) => r.match_status === "CALLPLAN_MISSING" || r.match_status === "BOTH_MISSING",
+        );
+      default:
+        return null;
+    }
+  }, [preview, selectedPreviewCategory]);
 
   const batchIds = useMemo(() => {
     const batches = upload?.batches ?? [];
@@ -193,9 +238,11 @@ export default function DashboardPage() {
       setPreview(
         await previewMatches({
           token: session.token,
+          regionId,
           ...batchIds,
         }),
       );
+      setSelectedPreviewCategory(null);
     });
   }
 
@@ -224,6 +271,7 @@ export default function DashboardPage() {
     setUpload(null);
     setPreview(null);
     setReport(null);
+    setSelectedPreviewCategory(null);
   }
 
   const canUseBatches =
@@ -371,12 +419,84 @@ export default function DashboardPage() {
                 </button>
               </div>
               <div className="metricGrid">
-                <Metric label="Renderways" value={preview.totalRenderwaysRows} />
-                <Metric label="Flex matched" value={preview.flexMatchedRows} />
-                <Metric label="Call Plan matched" value={preview.callPlanMatchedRows} />
-                <Metric label="Flex missing" value={preview.unmatchedFlexRows} />
-                <Metric label="Call Plan missing" value={preview.unmatchedCallPlanRows} />
+                <Metric
+                  label="Renderways"
+                  value={preview.totalRenderwaysRows}
+                  onClick={() =>
+                    setSelectedPreviewCategory(
+                      selectedPreviewCategory === "Renderways" ? null : "Renderways"
+                    )
+                  }
+                  isActive={selectedPreviewCategory === "Renderways"}
+                />
+                <Metric
+                  label="Flex matched"
+                  value={preview.flexMatchedRows}
+                  onClick={() =>
+                    setSelectedPreviewCategory(
+                      selectedPreviewCategory === "Flex matched" ? null : "Flex matched"
+                    )
+                  }
+                  isActive={selectedPreviewCategory === "Flex matched"}
+                />
+                <Metric
+                  label="Call Plan matched"
+                  value={preview.callPlanMatchedRows}
+                  onClick={() =>
+                    setSelectedPreviewCategory(
+                      selectedPreviewCategory === "Call Plan matched" ? null : "Call Plan matched"
+                    )
+                  }
+                  isActive={selectedPreviewCategory === "Call Plan matched"}
+                />
+                <Metric
+                  label="Flex missing"
+                  value={preview.unmatchedFlexRows}
+                  onClick={() =>
+                    setSelectedPreviewCategory(
+                      selectedPreviewCategory === "Flex missing" ? null : "Flex missing"
+                    )
+                  }
+                  isActive={selectedPreviewCategory === "Flex missing"}
+                />
+                <Metric
+                  label="Call Plan missing"
+                  value={preview.unmatchedCallPlanRows}
+                  onClick={() =>
+                    setSelectedPreviewCategory(
+                      selectedPreviewCategory === "Call Plan missing" ? null : "Call Plan missing"
+                    )
+                  }
+                  isActive={selectedPreviewCategory === "Call Plan missing"}
+                />
               </div>
+              {selectedPreviewCategory && selectedRecords && selectedRecords.length > 0 && (
+                <div style={{ marginTop: "16px", minWidth: 0 }}>
+                  <h3 style={{ fontSize: "15px", marginBottom: "12px" }}>
+                    {selectedPreviewCategory} Records
+                  </h3>
+                  <div className="tableWrap" style={{ maxHeight: "400px" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          {Object.keys(selectedRecords[0]).map((key) => (
+                            <th key={key}>{key}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedRecords.map((row, i) => (
+                          <tr key={i}>
+                            {Object.values(row).map((val, j) => (
+                              <td key={j}>{String(val ?? "")}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </section>
           ) : null}
 

@@ -5,6 +5,10 @@ import {
   findRenderwaysRecordsByBatchId,
 } from "../../repositories/sourceRecordRepository.js";
 import { findUploadBatchesForValidation } from "../../repositories/uploadBatchRepository.js";
+import {
+  findActiveSlaHoursByCategory,
+  findAreaNameByPincode,
+} from "../../repositories/businessRuleRepository.js";
 import { assertCanAccessBatchRegions } from "../rbac/regionAccessService.js";
 import type { AuthenticatedUser } from "../../types/auth.js";
 import type {
@@ -20,6 +24,7 @@ export interface MatchPreviewInput {
   renderwaysUploadBatchId: string;
   callPlanUploadBatchId: string;
   currentUser: AuthenticatedUser;
+  regionId: string;
 }
 
 export interface MatchPreviewResult {
@@ -67,10 +72,19 @@ export async function previewMatches(
       client,
       input.callPlanUploadBatchId,
     );
+
+    const slaHoursByWipAgingCategory = await findActiveSlaHoursByCategory(client);
+    const areaNameByPincode = await findAreaNameByPincode(
+      client,
+      input.regionId,
+    );
+
     const matches = matchSourceRecords({
       flexWip,
       renderways,
       callPlan,
+      slaHoursByWipAgingCategory,
+      areaNameByPincode,
     });
     let flexMatchedRows = 0;
     let callPlanMatchedRows = 0;

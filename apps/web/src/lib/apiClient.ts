@@ -168,16 +168,23 @@ export async function uploadReports(input: {
 
 export async function previewMatches(input: {
   token: string;
+  regionId: string;
   flexUploadBatchId: string;
   renderwaysUploadBatchId: string;
   callPlanUploadBatchId: string;
 }): Promise<MatchPreviewResponse> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${input.token}`,
+    "Content-Type": "application/json",
+  };
+
+  if (input.regionId.trim()) {
+    headers["x-region-id"] = input.regionId.trim();
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/v1/matches/preview`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${input.token}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
       flexUploadBatchId: input.flexUploadBatchId,
       renderwaysUploadBatchId: input.renderwaysUploadBatchId,
