@@ -41,6 +41,8 @@ Initial seed data:
 infra/postgres/seeds/001_region_mapping.sql
 ```
 
+**IMPORTANT**: All migration files in `infra/postgres/migrations/` must be applied to the database in order before running the application. These migrations define the complete schema including optional batch ID fields for complementary data sources.
+
 ## Phase 2 API
 
 Backend entrypoint:
