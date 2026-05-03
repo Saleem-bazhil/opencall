@@ -39,6 +39,7 @@ export interface RenderwaysParsedRecord {
   partnerAccept: Date | null;
   wipAging: string | null;
   wipAgingCategory: string | null;
+  rtplStatus: string | null;
   hpOwner: string | null;
   rcaMessage: string | null;
   productType: string | null;

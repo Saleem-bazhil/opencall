@@ -5,8 +5,18 @@ import {
 import type { EnrichedCallPlanRow } from "../../types/matching.js";
 import type { DailyCallPlanOutputRow } from "../../types/reportGeneration.js";
 
+export const MANUAL_ENTRY_REQUIRED = "Manual Entry Required";
+
 function valueOrEmpty(value: string | number | null | undefined): string | number {
   return value ?? "";
+}
+
+function valueOrManual(value: string | number | null | undefined): string | number {
+  if (value === null || value === undefined || value === "") {
+    return MANUAL_ENTRY_REQUIRED;
+  }
+
+  return value;
 }
 
 export function formatDailyCallPlanRow(
@@ -16,25 +26,25 @@ export function formatDailyCallPlanRow(
   return {
     "S.no": serialNo,
     "Ticket ID": valueOrEmpty(row.ticket_id),
-    "Case ID": valueOrEmpty(row.case_id),
-    "Case Created Time": valueOrEmpty(row.case_created_time),
-    "WIP aging": valueOrEmpty(row.wip_aging),
-    "RTPL status": valueOrEmpty(row.rtpl_status),
-    Segment: valueOrEmpty(row.segment),
-    Engineer: valueOrEmpty(row.engineer),
+    "Case ID": valueOrManual(row.case_id),
+    "Case Created Time": valueOrManual(row.case_created_time),
+    "WIP aging": valueOrManual(row.wip_aging),
+    "RTPL status": valueOrManual(row.rtpl_status),
+    Segment: valueOrManual(row.segment),
+    Engineer: valueOrManual(row.engineer),
     Product: valueOrEmpty(row.product),
     "Flex Status": valueOrEmpty(row.flex_status),
-    "HP Owner Status": valueOrEmpty(row.hp_owner_status),
-    "WO OTC CODE": valueOrEmpty(row.wo_otc_code),
-    "Account Name": valueOrEmpty(row.account_name),
+    "HP Owner Status": valueOrManual(row.hp_owner_status),
+    "WO OTC CODE": valueOrManual(row.wo_otc_code),
+    "Account Name": valueOrManual(row.account_name),
     "Customer Name": valueOrEmpty(row.customer_name),
-    Location: valueOrEmpty(row.location),
+    Location: valueOrManual(row.location),
     Contact: valueOrEmpty(row.contact),
     Part: valueOrEmpty(row.part),
-    "WIP Aging Category": valueOrEmpty(row.wip_aging_category),
-    TAT: valueOrEmpty(row.tat),
-    "Customer Mail": valueOrEmpty(row.customer_mail),
-    RCA: valueOrEmpty(row.rca),
+    "WIP Aging Category": valueOrManual(row.wip_aging_category),
+    TAT: valueOrManual(row.tat),
+    "Customer Mail": valueOrManual(row.customer_mail),
+    RCA: valueOrManual(row.rca),
   };
 }
 

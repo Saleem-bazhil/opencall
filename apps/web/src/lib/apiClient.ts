@@ -51,6 +51,7 @@ export interface UploadResponse {
 
 export interface MatchPreviewResponse {
   totalRenderwaysRows: number;
+  totalFlexRows?: number;
   flexMatchedRows: number;
   callPlanMatchedRows: number;
   unmatchedFlexRows: number;
@@ -143,13 +144,17 @@ export async function uploadReports(input: {
   token: string;
   regionId: string;
   flexWipReport: File;
-  renderwaysReport: File;
-  callPlan: File;
+  renderwaysReport?: File;
+  callPlan?: File;
 }): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("flexWipReport", input.flexWipReport);
-  formData.append("renderwaysReport", input.renderwaysReport);
-  formData.append("callPlan", input.callPlan);
+  if (input.renderwaysReport) {
+    formData.append("renderwaysReport", input.renderwaysReport);
+  }
+  if (input.callPlan) {
+    formData.append("callPlan", input.callPlan);
+  }
 
   if (input.regionId.trim()) {
     formData.append("regionId", input.regionId.trim());
@@ -170,8 +175,8 @@ export async function previewMatches(input: {
   token: string;
   regionId: string;
   flexUploadBatchId: string;
-  renderwaysUploadBatchId: string;
-  callPlanUploadBatchId: string;
+  renderwaysUploadBatchId?: string;
+  callPlanUploadBatchId?: string;
 }): Promise<MatchPreviewResponse> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${input.token}`,
@@ -187,8 +192,8 @@ export async function previewMatches(input: {
     headers,
     body: JSON.stringify({
       flexUploadBatchId: input.flexUploadBatchId,
-      renderwaysUploadBatchId: input.renderwaysUploadBatchId,
-      callPlanUploadBatchId: input.callPlanUploadBatchId,
+      renderwaysUploadBatchId: input.renderwaysUploadBatchId || null,
+      callPlanUploadBatchId: input.callPlanUploadBatchId || null,
     }),
   });
 
@@ -200,8 +205,8 @@ export async function generateReport(input: {
   regionId: string;
   reportDate: string;
   flexUploadBatchId: string;
-  renderwaysUploadBatchId: string;
-  callPlanUploadBatchId: string;
+  renderwaysUploadBatchId?: string;
+  callPlanUploadBatchId?: string;
 }): Promise<GeneratedReportResponse> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${input.token}`,
@@ -220,8 +225,8 @@ export async function generateReport(input: {
       body: JSON.stringify({
         reportDate: input.reportDate,
         flexUploadBatchId: input.flexUploadBatchId,
-        renderwaysUploadBatchId: input.renderwaysUploadBatchId,
-        callPlanUploadBatchId: input.callPlanUploadBatchId,
+        renderwaysUploadBatchId: input.renderwaysUploadBatchId || null,
+        callPlanUploadBatchId: input.callPlanUploadBatchId || null,
       }),
     },
   );

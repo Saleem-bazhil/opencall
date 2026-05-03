@@ -39,6 +39,7 @@ const REQUIRED_COLUMNS: readonly RequiredColumn[] = [
   { tableName: "renderways_records", columnName: "normalized_ticket_id" },
   { tableName: "renderways_records", columnName: "normalized_case_id" },
   { tableName: "renderways_records", columnName: "partner_accept" },
+  { tableName: "renderways_records", columnName: "rtpl_status" },
   { tableName: "call_plan_records", columnName: "normalized_ticket_id" },
   { tableName: "call_plan_records", columnName: "morning_status" },
   { tableName: "sla_rules", columnName: "wip_aging_category" },

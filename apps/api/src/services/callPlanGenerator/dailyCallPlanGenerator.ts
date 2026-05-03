@@ -47,6 +47,7 @@ function countUnmatchedRows(
   rows: readonly GeneratedDailyCallPlanRow[],
 ): number {
   const unmatchedStatuses: ReadonlySet<MatchStatus> = new Set([
+    "RENDERWAYS_MISSING",
     "FLEX_MISSING",
     "CALLPLAN_MISSING",
     "BOTH_MISSING",
@@ -67,25 +68,22 @@ export async function generateDailyCallPlanReport(
       client,
       input.flexUploadBatchId,
     );
-    const renderways = await findRenderwaysRecordsByBatchId(
-      client,
-      input.renderwaysUploadBatchId,
-    );
-    const callPlan = await findCallPlanRecordsByBatchId(
-      client,
-      input.callPlanUploadBatchId,
-    );
+    const renderways = input.renderwaysUploadBatchId
+      ? await findRenderwaysRecordsByBatchId(
+          client,
+          input.renderwaysUploadBatchId,
+        )
+      : [];
+    const callPlan = input.callPlanUploadBatchId
+      ? await findCallPlanRecordsByBatchId(
+          client,
+          input.callPlanUploadBatchId,
+        )
+      : [];
 
-    if (renderways.length === 0) {
-      throw unprocessableEntity("Renderways batch has no persisted rows", {
-        renderwaysUploadBatchId: input.renderwaysUploadBatchId,
-      });
-    }
-
-    if (flexWip.length === 0 || callPlan.length === 0) {
-      throw unprocessableEntity("Required enrichment batches have no persisted rows", {
+    if (flexWip.length === 0) {
+      throw unprocessableEntity("Flex WIP batch has no persisted rows", {
         flexRows: flexWip.length,
-        callPlanRows: callPlan.length,
       });
     }
 
@@ -101,7 +99,7 @@ export async function generateDailyCallPlanReport(
       slaHoursByWipAgingCategory,
       areaNameByPincode,
     });
-    const matchedMatches = matches.filter((match) => match.matchStatus !== "BOTH_MISSING");
+    const matchedMatches = matches.filter((match) => match.flexWip !== null);
     
     matchedMatches.sort((a, b) => {
       const aAging = parseInt(a.enrichedRow.wip_aging ?? "0", 10);

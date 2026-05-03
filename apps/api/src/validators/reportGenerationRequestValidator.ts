@@ -18,8 +18,8 @@ export const reportGenerationRequestSchema = z.object({
   generatedBy: z.string().uuid(),
   regionId: z.string().uuid().nullable().optional(),
   flexUploadBatchId: z.string().uuid(),
-  renderwaysUploadBatchId: z.string().uuid(),
-  callPlanUploadBatchId: z.string().uuid(),
+  renderwaysUploadBatchId: z.string().uuid().nullable().optional(),
+  callPlanUploadBatchId: z.string().uuid().nullable().optional(),
 });
 
 export type ReportGenerationRequestInput = z.infer<

@@ -7,6 +7,7 @@ import type {
 export type MatchConfidence = "TICKET_ID" | "CASE_ID" | "UNMATCHED";
 export type MatchStatus =
   | "MATCHED"
+  | "RENDERWAYS_MISSING"
   | "FLEX_MISSING"
   | "CALLPLAN_MISSING"
   | "BOTH_MISSING";
@@ -49,7 +50,7 @@ export interface EnrichedCallPlanRow {
 }
 
 export interface MatchedCallPlanRecord {
-  renderways: RenderwaysParsedRecord;
+  renderways: RenderwaysParsedRecord | null;
   flexWip: FlexWipParsedRecord | null;
   callPlan: CallPlanParsedRecord | null;
   flexMatchConfidence: MatchConfidence;

@@ -11,13 +11,14 @@ const FIELD_TO_SOURCE: Record<UploadFieldName, UploadSourceType> = {
   callPlan: "CALL_PLAN",
 };
 
-const REQUIRED_FIELDS = Object.keys(FIELD_TO_SOURCE) as UploadFieldName[];
+const ALL_FIELDS = Object.keys(FIELD_TO_SOURCE) as UploadFieldName[];
+const REQUIRED_FIELDS: UploadFieldName[] = ["flexWipReport"];
 
 export function getUploadedSourceFiles(
   files: Express.Multer.File[] | Record<string, Express.Multer.File[]> | undefined,
 ): UploadedSourceFile[] {
   if (!files || Array.isArray(files)) {
-    throw badRequest("Expected multipart files for all report sources");
+    throw badRequest("Expected multipart files for report sources");
   }
 
   const missingFields = REQUIRED_FIELDS.filter((fieldName) => {
@@ -28,20 +29,21 @@ export function getUploadedSourceFiles(
     throw badRequest("Missing required report files", {
       missingFields,
       requiredFields: REQUIRED_FIELDS,
+      optionalFields: ALL_FIELDS.filter((fieldName) => !REQUIRED_FIELDS.includes(fieldName)),
     });
   }
 
-  return REQUIRED_FIELDS.map((fieldName) => {
+  return ALL_FIELDS.flatMap((fieldName) => {
     const file = files[fieldName]?.[0];
 
     if (!file) {
-      throw badRequest("Missing required report file", { fieldName });
+      return [];
     }
 
-    return {
+    return [{
       fieldName,
       sourceType: FIELD_TO_SOURCE[fieldName],
       file,
-    };
+    }];
   });
 }

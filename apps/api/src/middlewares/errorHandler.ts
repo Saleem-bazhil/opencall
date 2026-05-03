@@ -41,6 +41,10 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
+  // Keep an explicit server-side trace for unexpected 500s.
+  // This does not leak details to clients but helps local debugging.
+  console.error("[errorHandler] Unhandled error:", error);
+
   response.status(500).json({
     error: {
       code: "INTERNAL_SERVER_ERROR",

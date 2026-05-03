@@ -130,6 +130,46 @@ function findFlexMatch(
   };
 }
 
+function findRenderwaysMatch(
+  flexWip: FlexWipParsedRecord,
+  renderwaysByTicket: IndexedLookup<RenderwaysParsedRecord>,
+  renderwaysByCase: IndexedLookup<RenderwaysParsedRecord>,
+): MatchResult<RenderwaysParsedRecord, MatchConfidence> {
+  const ticketKey = canonicalTicketKey(flexWip);
+
+  if (ticketKey) {
+    const ticketMatch = renderwaysByTicket.records.get(ticketKey);
+
+    if (ticketMatch) {
+      return {
+        record: ticketMatch,
+        confidence: "TICKET_ID",
+        duplicateKey: renderwaysByTicket.duplicateKeys.has(ticketKey) ? ticketKey : null,
+      };
+    }
+  }
+
+  const caseKey = canonicalCaseKey(flexWip);
+
+  if (caseKey) {
+    const caseMatch = renderwaysByCase.records.get(caseKey);
+
+    if (caseMatch) {
+      return {
+        record: caseMatch,
+        confidence: "CASE_ID",
+        duplicateKey: renderwaysByCase.duplicateKeys.has(caseKey) ? caseKey : null,
+      };
+    }
+  }
+
+  return {
+    record: null,
+    confidence: "UNMATCHED",
+    duplicateKey: null,
+  };
+}
+
 function findCallPlanMatch(
   ticketKey: string | null,
   callPlanByTicket: IndexedLookup<CallPlanParsedRecord>,
@@ -184,7 +224,7 @@ function toIsoString(value: Date | string | null | undefined): string | null {
 }
 
 function buildEnrichedRow(
-  renderways: RenderwaysParsedRecord,
+  renderways: RenderwaysParsedRecord | null,
   flexWip: FlexWipParsedRecord | null,
   callPlan: CallPlanParsedRecord | null,
   matchStatus: MatchStatus,
@@ -192,56 +232,55 @@ function buildEnrichedRow(
 ): EnrichedCallPlanRow {
   const slaHours = getLookupNumber(
     input.slaHoursByWipAgingCategory,
-    renderways.wipAgingCategory,
+    renderways?.wipAgingCategory,
   );
 
   return {
-    ticket_id: renderways.ticketId ?? flexWip?.ticketId ?? callPlan?.ticketId ?? "",
-    case_id: renderways.caseId ?? flexWip?.caseId ?? "",
-    case_created_time: toIsoString(renderways.partnerAccept),
-    wip_aging: renderways.wipAging,
-    rtpl_status: callPlan?.morningStatus ?? "",
-    segment: getSegment(renderways.productType, renderways.callClassification),
+    ticket_id: flexWip?.ticketId ?? renderways?.ticketId ?? callPlan?.ticketId ?? "",
+    case_id: flexWip?.caseId ?? renderways?.caseId ?? "",
+    case_created_time: toIsoString(renderways?.partnerAccept),
+    wip_aging: renderways?.wipAging ?? null,
+    rtpl_status: renderways?.rtplStatus ?? callPlan?.morningStatus ?? "",
+    segment: getSegment(renderways?.productType, renderways?.callClassification),
     engineer: callPlan?.engineer ?? null,
     product: flexWip?.product ?? null,
     flex_status: flexWip?.flexStatus ?? null,
-    hp_owner_status: renderways.hpOwner,
+    hp_owner_status: renderways?.hpOwner ?? null,
     wo_otc_code: flexWip?.woOtcCode ?? null,
     account_name: flexWip?.accountName ?? null,
     customer_name: flexWip?.customerName ?? null,
     location: callPlan?.location ?? mapLocation(flexWip?.customerPincode, input.areaNameByPincode),
     contact: flexWip?.contact ?? null,
     part: flexWip?.partDescription ?? null,
-    wip_aging_category: renderways.wipAgingCategory,
-    tat: calculateTAT(renderways.partnerAccept, slaHours),
+    wip_aging_category: renderways?.wipAgingCategory ?? null,
+    tat: calculateTAT(renderways?.partnerAccept, slaHours),
     customer_mail: flexWip?.customerEmail ?? null,
-    rca: renderways.rcaMessage,
+    rca: renderways?.rcaMessage ?? null,
     match_status: matchStatus,
   };
 }
 
 function buildMatchNotes(
-  flexMatch: MatchResult<FlexWipParsedRecord, MatchConfidence>,
+  renderwaysMatch: MatchResult<RenderwaysParsedRecord, MatchConfidence>,
   callPlanMatch: MatchResult<
     CallPlanParsedRecord,
     Exclude<MatchConfidence, "CASE_ID">
   >,
-  renderways: RenderwaysParsedRecord,
-  flexCallPlanTicketKey: string | null,
+  flexWip: FlexWipParsedRecord,
 ): string[] {
   const notes: string[] = [];
 
-  if (flexMatch.confidence === "UNMATCHED") {
-    notes.push("No Flex WIP match found by Ticket ID or Case ID");
+  if (renderwaysMatch.confidence === "UNMATCHED") {
+    notes.push("No Renderways match found by Ticket ID or Case ID");
   }
 
   if (callPlanMatch.confidence === "UNMATCHED") {
     notes.push("No Call Plan match found by Ticket ID");
   }
 
-  if (flexMatch.duplicateKey) {
+  if (renderwaysMatch.duplicateKey) {
     notes.push(
-      `Multiple Flex WIP rows found for ${flexMatch.confidence}: ${flexMatch.duplicateKey}; selected lowest row number`,
+      `Multiple Renderways rows found for ${renderwaysMatch.confidence}: ${renderwaysMatch.duplicateKey}; selected lowest row number`,
     );
   }
 
@@ -251,8 +290,8 @@ function buildMatchNotes(
     );
   }
 
-  if (!canonicalTicketKey(renderways) && flexCallPlanTicketKey) {
-    notes.push("Call Plan lookup used Flex WIP Ticket ID after Case ID match");
+  if (!canonicalTicketKey(flexWip) && flexWip.normalizedCaseId) {
+    notes.push("Call Plan lookup skipped because Flex WIP Ticket ID is missing");
   }
 
   return notes;
@@ -263,45 +302,92 @@ export function matchSourceRecords(
 ): MatchedCallPlanRecord[] {
   const flexByTicket = buildSingleRecordLookup(input.flexWip, canonicalTicketKey);
   const flexByCase = buildSingleRecordLookup(input.flexWip, canonicalCaseKey);
+  const renderwaysByTicket = buildSingleRecordLookup(
+    input.renderways,
+    canonicalTicketKey,
+  );
+  const renderwaysByCase = buildSingleRecordLookup(
+    input.renderways,
+    canonicalCaseKey,
+  );
   const callPlanByTicket = buildSingleRecordLookup(
     input.callPlan,
     canonicalTicketKey,
   );
   const matchedRecords: MatchedCallPlanRecord[] = [];
 
-  for (const renderways of input.renderways) {
-    const flexMatch = findFlexMatch(renderways, flexByTicket, flexByCase);
-    const renderwaysTicketKey = canonicalTicketKey(renderways);
-    const flexCallPlanTicketKey = flexMatch.record
-      ? canonicalTicketKey(flexMatch.record)
-      : null;
-    const callPlanTicketKey = renderwaysTicketKey ?? flexCallPlanTicketKey;
-    const callPlanMatch = findCallPlanMatch(callPlanTicketKey, callPlanByTicket);
-    const matchStatus = classifyMatchStatus(
-      flexMatch.record,
-      callPlanMatch.record,
+  for (const flexWip of input.flexWip) {
+    const renderwaysMatch = findRenderwaysMatch(
+      flexWip,
+      renderwaysByTicket,
+      renderwaysByCase,
     );
+    const callPlanTicketKey = canonicalTicketKey(flexWip);
+    const callPlanMatch = findCallPlanMatch(callPlanTicketKey, callPlanByTicket);
+    const matchStatus: MatchStatus =
+      renderwaysMatch.record && callPlanMatch.record
+        ? "MATCHED"
+        : renderwaysMatch.record
+          ? "CALLPLAN_MISSING"
+          : "RENDERWAYS_MISSING";
 
     matchedRecords.push({
-      renderways,
-      flexWip: flexMatch.record,
+      renderways: renderwaysMatch.record,
+      flexWip,
       callPlan: callPlanMatch.record,
-      flexMatchConfidence: flexMatch.confidence,
+      flexMatchConfidence: "TICKET_ID",
       callPlanMatchConfidence: callPlanMatch.confidence,
       matchStatus,
       enrichedRow: buildEnrichedRow(
-        renderways,
-        flexMatch.record,
+        renderwaysMatch.record,
+        flexWip,
         callPlanMatch.record,
         matchStatus,
         input,
       ),
       notes: buildMatchNotes(
-        flexMatch,
+        renderwaysMatch,
         callPlanMatch,
-        renderways,
-        flexCallPlanTicketKey,
+        flexWip,
       ),
+    });
+  }
+
+  const matchedFlexIds = new Set(
+    matchedRecords.map((match) => match.flexWip?.id ?? stableRecordRank(match.flexWip!)),
+  );
+
+  for (const renderways of input.renderways) {
+    const flexMatch = findFlexMatch(renderways, flexByTicket, flexByCase);
+
+    if (flexMatch.record) {
+      const flexId = flexMatch.record.id ?? stableRecordRank(flexMatch.record);
+
+      if (matchedFlexIds.has(flexId)) {
+        continue;
+      }
+    }
+
+    const renderwaysTicketKey = canonicalTicketKey(renderways);
+    const callPlanMatch = findCallPlanMatch(renderwaysTicketKey, callPlanByTicket);
+
+    matchedRecords.push({
+      renderways,
+      flexWip: null,
+      callPlan: callPlanMatch.record,
+      flexMatchConfidence: flexMatch.confidence,
+      callPlanMatchConfidence: callPlanMatch.confidence,
+      matchStatus: classifyMatchStatus(null, callPlanMatch.record),
+      enrichedRow: buildEnrichedRow(
+        renderways,
+        null,
+        callPlanMatch.record,
+        classifyMatchStatus(null, callPlanMatch.record),
+        input,
+      ),
+      notes: [
+        "Renderways row did not match the primary Flex WIP dataset and is excluded from Flex-first reports",
+      ],
     });
   }
 

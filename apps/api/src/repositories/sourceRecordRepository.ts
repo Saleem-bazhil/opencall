@@ -33,6 +33,7 @@ interface RenderwaysRecordRow {
   partner_accept: Date | null;
   wip_aging: string | null;
   wip_aging_category: string | null;
+  rtpl_status: string | null;
   hp_owner: string | null;
   rca_message: string | null;
   product_type: string | null;
@@ -47,6 +48,7 @@ interface CallPlanRecordRow {
   normalized_ticket_id: string;
   morning_status: string | null;
   engineer: string | null;
+  location: string | null;
   raw_row: Record<string, unknown>;
   row_number: number;
 }
@@ -121,6 +123,7 @@ export async function insertRenderwaysRecords(
           partner_accept,
           wip_aging,
           wip_aging_category,
+          rtpl_status,
           hp_owner,
           rca_message,
           product_type,
@@ -130,7 +133,7 @@ export async function insertRenderwaysRecords(
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7,
-          $8, $9, $10, $11, $12, $13::jsonb, $14
+          $8, $9, $10, $11, $12, $13, $14::jsonb, $15
         )
       `,
       [
@@ -142,6 +145,7 @@ export async function insertRenderwaysRecords(
         record.partnerAccept,
         record.wipAging,
         record.wipAgingCategory,
+        record.rtplStatus,
         record.hpOwner,
         record.rcaMessage,
         record.productType,
@@ -252,6 +256,7 @@ export async function findRenderwaysRecordsByBatchId(
         partner_accept,
         wip_aging,
         wip_aging_category,
+        rtpl_status,
         hp_owner,
         rca_message,
         product_type,
@@ -274,6 +279,7 @@ export async function findRenderwaysRecordsByBatchId(
     partnerAccept: row.partner_accept,
     wipAging: row.wip_aging,
     wipAgingCategory: row.wip_aging_category,
+    rtplStatus: row.rtpl_status,
     hpOwner: row.hp_owner,
     rcaMessage: row.rca_message,
     productType: row.product_type,

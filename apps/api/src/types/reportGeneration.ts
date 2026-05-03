@@ -11,8 +11,8 @@ export interface GenerateDailyCallPlanInput {
   generatedBy: string;
   regionId: string | null;
   flexUploadBatchId: string;
-  renderwaysUploadBatchId: string;
-  callPlanUploadBatchId: string;
+  renderwaysUploadBatchId?: string | null | undefined;
+  callPlanUploadBatchId?: string | null | undefined;
 }
 
 export interface GeneratedDailyCallPlanRow {

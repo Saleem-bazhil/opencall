@@ -105,6 +105,7 @@ export function parseRenderwaysReport(
       partnerAccept: parseExcelDate(getCell(row.values, ["Partner Accept", "Partner Accepted", "Case Created Time"])),
       wipAging: cleanString(getCell(row.values, ["WIP Aging", "WIP aging"])),
       wipAgingCategory: cleanString(getCell(row.values, ["WIP Aging Category"])),
+      rtplStatus: cleanString(getCell(row.values, ["RTPL Status", "RTPL status", "Morning Status"])),
       hpOwner: cleanString(getCell(row.values, ["HP Owner", "HP Owner Status"])),
       rcaMessage: cleanString(getCell(row.values, ["RCA Message", "RCA"])),
       productType: cleanString(getCell(row.values, ["Product Type"])),

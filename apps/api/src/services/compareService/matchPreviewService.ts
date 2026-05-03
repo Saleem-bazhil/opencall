@@ -21,14 +21,15 @@ import { matchSourceRecords } from "./matchingEngine.js";
 
 export interface MatchPreviewInput {
   flexUploadBatchId: string;
-  renderwaysUploadBatchId: string;
-  callPlanUploadBatchId: string;
+  renderwaysUploadBatchId?: string | null | undefined;
+  callPlanUploadBatchId?: string | null | undefined;
   currentUser: AuthenticatedUser;
-  regionId: string;
+  regionId: string | null;
 }
 
 export interface MatchPreviewResult {
   totalRenderwaysRows: number;
+  totalFlexRows: number;
   flexMatchedRows: number;
   callPlanMatchedRows: number;
   unmatchedFlexRows: number;
@@ -48,7 +49,7 @@ export async function previewMatches(
       input.flexUploadBatchId,
       input.renderwaysUploadBatchId,
       input.callPlanUploadBatchId,
-    ];
+    ].filter((batchId): batchId is string => Boolean(batchId));
     const batches = await findUploadBatchesForValidation(client, batchIds);
 
     if (batches.length !== batchIds.length) {
@@ -64,14 +65,18 @@ export async function previewMatches(
       client,
       input.flexUploadBatchId,
     );
-    const renderways = await findRenderwaysRecordsByBatchId(
-      client,
-      input.renderwaysUploadBatchId,
-    );
-    const callPlan = await findCallPlanRecordsByBatchId(
-      client,
-      input.callPlanUploadBatchId,
-    );
+    const renderways = input.renderwaysUploadBatchId
+      ? await findRenderwaysRecordsByBatchId(
+          client,
+          input.renderwaysUploadBatchId,
+        )
+      : [];
+    const callPlan = input.callPlanUploadBatchId
+      ? await findCallPlanRecordsByBatchId(
+          client,
+          input.callPlanUploadBatchId,
+        )
+      : [];
 
     const slaHoursByWipAgingCategory = await findActiveSlaHoursByCategory(client);
     const areaNameByPincode = await findAreaNameByPincode(
@@ -91,17 +96,18 @@ export async function previewMatches(
     const enrichedRows: EnrichedCallPlanRow[] = [];
     const matchStatusCounts: Record<MatchStatus, number> = {
       MATCHED: 0,
+      RENDERWAYS_MISSING: 0,
       FLEX_MISSING: 0,
       CALLPLAN_MISSING: 0,
       BOTH_MISSING: 0,
     };
 
     for (const match of matches) {
-      if (match.flexWip) {
+      if (match.flexWip && match.renderways) {
         flexMatchedRows += 1;
       }
 
-      if (match.callPlan) {
+      if (match.flexWip && match.callPlan) {
         callPlanMatchedRows += 1;
       }
 
@@ -111,10 +117,11 @@ export async function previewMatches(
 
     return {
       totalRenderwaysRows: renderways.length,
+      totalFlexRows: flexWip.length,
       flexMatchedRows,
       callPlanMatchedRows,
-      unmatchedFlexRows: renderways.length - flexMatchedRows,
-      unmatchedCallPlanRows: renderways.length - callPlanMatchedRows,
+      unmatchedFlexRows: matches.filter((match) => !match.flexWip).length,
+      unmatchedCallPlanRows: flexWip.length - callPlanMatchedRows,
       matchStatusCounts,
       enrichedRows,
       matches,

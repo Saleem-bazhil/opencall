@@ -32,11 +32,14 @@ const FILE_FIELDS: Array<{
   field: FileField;
   source: SourceKey;
   label: string;
+  required: boolean;
 }> = [
-  { field: "flexWipReport", source: "FLEX_WIP", label: "Flex WIP Report" },
-  { field: "renderwaysReport", source: "RENDERWAYS", label: "Renderways Report" },
-  { field: "callPlan", source: "CALL_PLAN", label: "Call Plan" },
+  { field: "flexWipReport", source: "FLEX_WIP", label: "Flex WIP Report", required: true },
+  { field: "renderwaysReport", source: "RENDERWAYS", label: "Renderways / RTPL Report", required: false },
+  { field: "callPlan", source: "CALL_PLAN", label: "Call Plan Report", required: false },
 ];
+
+const MANUAL_ENTRY_REQUIRED = "Manual Entry Required";
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -99,6 +102,8 @@ export default function DashboardPage() {
   const [upload, setUpload] = useState<UploadResponse | null>(null);
   const [preview, setPreview] = useState<MatchPreviewResponse | null>(null);
   const [report, setReport] = useState<GeneratedReportResponse | null>(null);
+  const [editingSerialNo, setEditingSerialNo] = useState<number | null>(null);
+  const [draftOutput, setDraftOutput] = useState<Record<string, string | number>>({});
   const [reportDate, setReportDate] = useState(todayIsoDate());
   const [dbHealth, setDbHealth] = useState<DatabaseHealthResponse | null>(null);
   const [runtimeHealth, setRuntimeHealth] =
@@ -209,8 +214,8 @@ export default function DashboardPage() {
     const renderwaysReport = files.renderwaysReport;
     const callPlan = files.callPlan;
 
-    if (!flexWipReport || !renderwaysReport || !callPlan) {
-      setMessage("Select all three Excel files");
+    if (!flexWipReport) {
+      setMessage("Flex WIP Report is required before processing");
       return;
     }
 
@@ -219,12 +224,14 @@ export default function DashboardPage() {
         token: session.token,
         regionId,
         flexWipReport,
-        renderwaysReport,
-        callPlan,
+        ...(renderwaysReport ? { renderwaysReport } : {}),
+        ...(callPlan ? { callPlan } : {}),
       });
       setUpload(result);
       setPreview(null);
       setReport(null);
+      setEditingSerialNo(null);
+      setDraftOutput({});
     });
   }
 
@@ -261,6 +268,8 @@ export default function DashboardPage() {
           ...batchIds,
         }),
       );
+      setEditingSerialNo(null);
+      setDraftOutput({});
     });
   }
 
@@ -271,13 +280,63 @@ export default function DashboardPage() {
     setUpload(null);
     setPreview(null);
     setReport(null);
+    setEditingSerialNo(null);
+    setDraftOutput({});
     setSelectedPreviewCategory(null);
   }
 
-  const canUseBatches =
-    Boolean(batchIds.flexUploadBatchId) &&
-    Boolean(batchIds.renderwaysUploadBatchId) &&
-    Boolean(batchIds.callPlanUploadBatchId);
+  const canUseBatches = Boolean(batchIds.flexUploadBatchId);
+  const incompleteCellCount = useMemo(() => {
+    return report?.rows.reduce((count, row) => {
+      return count + Object.values(row.output).filter((value) => value === MANUAL_ENTRY_REQUIRED).length;
+    }, 0) ?? 0;
+  }, [report]);
+
+  function startEditing(row: GeneratedReportResponse["rows"][number]) {
+    setEditingSerialNo(row.serialNo);
+    setDraftOutput({ ...row.output });
+  }
+
+  function cancelEditing() {
+    setEditingSerialNo(null);
+    setDraftOutput({});
+  }
+
+  function saveEditing(serialNo: number) {
+    setReport((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        rows: current.rows.map((row) =>
+          row.serialNo === serialNo
+            ? { ...row, output: { ...draftOutput, "S.no": row.serialNo } }
+            : row,
+        ),
+      };
+    });
+    cancelEditing();
+  }
+
+  function exportReport(download: (report: GeneratedReportResponse) => void) {
+    if (!report) {
+      return;
+    }
+
+    if (
+      incompleteCellCount > 0 &&
+      !window.confirm(
+        `${incompleteCellCount} field(s) still require manual entry. Export anyway?`,
+      )
+    ) {
+      setMessage("Export paused: complete highlighted manual-entry fields first.");
+      return;
+    }
+
+    download(report);
+  }
 
   return (
     <main className="appShell">
@@ -360,7 +419,12 @@ export default function DashboardPage() {
             <div className="fileGrid">
               {FILE_FIELDS.map((item) => (
                 <label className="fileDrop" key={item.field}>
-                  <span>{item.label}</span>
+                  <span>
+                    {item.label}{" "}
+                    <em className={item.required ? "requiredTag" : undefined}>
+                      {item.required ? "Required" : "Optional"}
+                    </em>
+                  </span>
                   <input
                     type="file"
                     accept=".xls,.xlsx"
@@ -372,7 +436,10 @@ export default function DashboardPage() {
                       }));
                     }}
                   />
-                  <strong>{files[item.field]?.name ?? "No file selected"}</strong>
+                  <strong>
+                    {files[item.field]?.name ??
+                      (item.required ? "Required file not selected" : "Optional")}
+                  </strong>
                 </label>
               ))}
             </div>
@@ -420,8 +487,8 @@ export default function DashboardPage() {
               </div>
               <div className="metricGrid">
                 <Metric
-                  label="Renderways"
-                  value={preview.totalRenderwaysRows}
+                  label="Flex WIP rows"
+                  value={preview.totalFlexRows ?? 0}
                   onClick={() =>
                     setSelectedPreviewCategory(
                       selectedPreviewCategory === "Renderways" ? null : "Renderways"
@@ -479,7 +546,7 @@ export default function DashboardPage() {
                     <table>
                       <thead>
                         <tr>
-                          {Object.keys(selectedRecords[0]).map((key) => (
+                          {Object.keys(selectedRecords[0] ?? {}).map((key) => (
                             <th key={key}>{key}</th>
                           ))}
                         </tr>
@@ -510,21 +577,26 @@ export default function DashboardPage() {
                 <div className="reportStats">
                   <Metric label="Rows" value={report.totalRows} />
                   <Metric label="Duplicates" value={report.duplicateTicketCount} />
-                  <Metric label="Unmatched" value={report.unmatchedTicketCount} />
+                  <Metric label="Manual Required" value={incompleteCellCount} />
                 </div>
               </div>
+              {incompleteCellCount > 0 ? (
+                <p className="hint">
+                  Click any highlighted "Manual Entry Required" cell or the row Edit button to enter manual data.
+                </p>
+              ) : null}
               <div className="downloadActions">
                 <button
                   className="downloadBtn excelBtn"
-                  onClick={() => downloadReportAsXlsx(report)}
+                  onClick={() => exportReport(downloadReportAsXlsx)}
                 >
-                  ⬇ Download Excel (.xls)
+                  Download Excel (.xlsx)
                 </button>
                 <button
                   className="downloadBtn csvBtn"
-                  onClick={() => downloadReportAsExcel(report)}
+                  onClick={() => exportReport(downloadReportAsExcel)}
                 >
-                  ⬇ Download CSV
+                  Download CSV
                 </button>
               </div>
               <div className="tableWrap">
@@ -534,16 +606,91 @@ export default function DashboardPage() {
                       {DAILY_CALL_PLAN_COLUMNS.map((column) => (
                         <th key={column}>{column}</th>
                       ))}
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {report.rows.map((row) => (
-                      <tr key={row.serialNo}>
-                        {DAILY_CALL_PLAN_COLUMNS.map((column) => (
-                          <td key={column}>{row.output[column]}</td>
-                        ))}
-                      </tr>
-                    ))}
+                    {report.rows.map((row) => {
+                      const isEditing = editingSerialNo === row.serialNo;
+
+                      return (
+                        <tr
+                          key={row.serialNo}
+                          className={
+                            Object.values(row.output).includes(MANUAL_ENTRY_REQUIRED)
+                              ? "incompleteRow"
+                              : undefined
+                          }
+                        >
+                          {DAILY_CALL_PLAN_COLUMNS.map((column) => {
+                            const value = isEditing ? draftOutput[column] : row.output[column];
+                            const isManualRequired = value === MANUAL_ENTRY_REQUIRED;
+                            const isReadOnly = column === "S.no" || column === "Ticket ID";
+
+                            return (
+                              <td
+                                key={column}
+                                className={isManualRequired ? "missingCell" : undefined}
+                                onClick={
+                                  !isEditing && isManualRequired && !isReadOnly
+                                    ? () => startEditing(row)
+                                    : undefined
+                                }
+                                style={
+                                  !isEditing && isManualRequired && !isReadOnly
+                                    ? { cursor: "pointer" }
+                                    : undefined
+                                }
+                                title={
+                                  !isEditing && isManualRequired && !isReadOnly
+                                    ? "Click to edit manual entry"
+                                    : undefined
+                                }
+                              >
+                                {isEditing && !isReadOnly ? (
+                                  <input
+                                    className="cellInput"
+                                    value={String(value ?? "")}
+                                    onChange={(event) =>
+                                      setDraftOutput((current) => ({
+                                        ...current,
+                                        [column]: event.target.value,
+                                      }))
+                                    }
+                                  />
+                                ) : (
+                                  String(value ?? "")
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td>
+                            {isEditing ? (
+                              <div className="rowActions">
+                                <button type="button" onClick={() => saveEditing(row.serialNo)}>
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  className="secondaryButton"
+                                  onClick={cancelEditing}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="secondaryButton"
+                                onClick={() => startEditing(row)}
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
