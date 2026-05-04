@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
+   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
@@ -17,6 +17,10 @@
     "./constants/sourceColumns": {
       "types": "./dist/constants/sourceColumns.d.ts",
       "default": "./dist/constants/sourceColumns.js"
+    },
+    "./constants/rtplStatusOptions": {
+      "types": "./dist/constants/rtplStatusOptions.d.ts",
+      "default": "./dist/constants/rtplStatusOptions.js"
     },
     "./types/report": {
       "types": "./dist/types/report.d.ts",

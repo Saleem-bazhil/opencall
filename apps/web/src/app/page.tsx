@@ -1,7 +1,7 @@
 "use client";
 
-import { DAILY_CALL_PLAN_COLUMNS } from "@opencall/shared";
-import { useEffect, useMemo, useState } from "react";
+import { DAILY_CALL_PLAN_COLUMNS, RTPL_STATUS_OPTIONS } from "@opencall/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   generateReport,
   getDatabaseHealth,
@@ -103,7 +103,9 @@ export default function DashboardPage() {
   const [preview, setPreview] = useState<MatchPreviewResponse | null>(null);
   const [report, setReport] = useState<GeneratedReportResponse | null>(null);
   const [editingSerialNo, setEditingSerialNo] = useState<number | null>(null);
-  const [draftOutput, setDraftOutput] = useState<Record<string, string | number>>({});
+   const [draftOutput, setDraftOutput] = useState<Record<string, string | number>>({});
+   const draftOutputRef = useRef(draftOutput);
+   draftOutputRef.current = draftOutput;
   const [reportDate, setReportDate] = useState(todayIsoDate());
   const [dbHealth, setDbHealth] = useState<DatabaseHealthResponse | null>(null);
   const [runtimeHealth, setRuntimeHealth] =
@@ -302,23 +304,23 @@ export default function DashboardPage() {
     setDraftOutput({});
   }
 
-  function saveEditing(serialNo: number) {
-    setReport((current) => {
-      if (!current) {
-        return current;
-      }
+   function saveEditing(serialNo: number) {
+     setReport((current) => {
+       if (!current) {
+         return current;
+       }
 
-      return {
-        ...current,
-        rows: current.rows.map((row) =>
-          row.serialNo === serialNo
-            ? { ...row, output: { ...draftOutput, "S.no": row.serialNo } }
-            : row,
-        ),
-      };
-    });
-    cancelEditing();
-  }
+       return {
+         ...current,
+         rows: current.rows.map((row) =>
+           row.serialNo === serialNo
+             ? { ...row, output: { ...draftOutputRef.current, "S.no": row.serialNo } }
+             : row,
+         ),
+       };
+     });
+     cancelEditing();
+   }
 
   function exportReport(download: (report: GeneratedReportResponse) => void) {
     if (!report) {
@@ -648,16 +650,67 @@ export default function DashboardPage() {
                                 }
                               >
                                 {isEditing && !isReadOnly ? (
-                                  <input
-                                    className="cellInput"
-                                    value={String(value ?? "")}
-                                    onChange={(event) =>
-                                      setDraftOutput((current) => ({
-                                        ...current,
-                                        [column]: event.target.value,
-                                      }))
-                                    }
-                                  />
+                                  column === "RTPL status" ? (
+                                    <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                                         <select
+                                           className="cellInput"
+                                           value={
+                                             draftOutput[column]
+                                               ? RTPL_STATUS_OPTIONS.some((opt) => opt === String(draftOutput[column]))
+                                                 ? String(draftOutput[column])
+                                                 : "Custom"
+                                               : ""
+                                           }
+                                           onChange={(event) => {
+                                             const selected = event.target.value;
+                                             if (selected === "Custom") {
+                                               setDraftOutput((current) => ({
+                                                 ...current,
+                                                 [column]: "",
+                                               }));
+                                             } else {
+                                               setDraftOutput((current) => ({
+                                                 ...current,
+                                                 [column]: selected || "",
+                                               }));
+                                             }
+                                           }}
+                                         >
+                                        <option value="">{MANUAL_ENTRY_REQUIRED}</option>
+                                        {RTPL_STATUS_OPTIONS.filter((opt) => opt !== "Custom").map((option) => (
+                                          <option key={option} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                        <option value="Custom">Custom</option>
+                                      </select>
+                                       {(draftOutput[column] === "" || !RTPL_STATUS_OPTIONS.some((opt) => opt === String(draftOutput[column]))) && (
+                                        <input
+                                          className="cellInput"
+                                          style={{ flex: 1 }}
+                                          value={String(draftOutput[column] ?? "")}
+                                          onChange={(event) =>
+                                            setDraftOutput((current) => ({
+                                              ...current,
+                                              [column]: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="Enter custom status"
+                                        />
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <input
+                                      className="cellInput"
+                                      value={String(value ?? "")}
+                                      onChange={(event) =>
+                                        setDraftOutput((current) => ({
+                                          ...current,
+                                          [column]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                  )
                                 ) : (
                                   String(value ?? "")
                                 )}
