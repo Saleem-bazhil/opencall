@@ -48,7 +48,7 @@ function assertValidReportDate(reportDate: string): void {
 export async function validateReportGenerationTransaction(
   client: PoolClient,
   input: GenerateDailyCallPlanInput,
-): Promise<void> {
+): Promise<string | null> {
   assertDistinctBatchIds(input);
   assertValidReportDate(input.reportDate);
 
@@ -101,9 +101,7 @@ export async function validateReportGenerationTransaction(
   );
 
   if (existingReport.rows[0]) {
-    throw conflict("Daily call plan report already exists for these inputs", {
-      reportId: existingReport.rows[0].id,
-    });
+    return existingReport.rows[0].id;
   }
 
   const batchRecords = await findUploadBatchesForValidation(
@@ -170,4 +168,6 @@ export async function validateReportGenerationTransaction(
       validationErrors,
     });
   }
+
+  return null;
 }

@@ -4,12 +4,30 @@ import helmet from "helmet";
 import { apiRouter } from "./routes/index.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFoundHandler.js";
+import { setupAdmin } from "./admin/admin.js";
 
-export function createApp() {
+export async function createApp() {
   const app = express();
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          imgSrc: ["'self'", "data:", "https://adminjs.co"],
+        },
+      },
+    }),
+  );
+
   app.use(cors());
+
+  // AdminJS must mount before body parsers
+  await setupAdmin(app);
+
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
 

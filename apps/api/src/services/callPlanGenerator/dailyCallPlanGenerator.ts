@@ -62,7 +62,7 @@ export async function generateDailyCallPlanReport(
   input: GenerateDailyCallPlanInput,
 ): Promise<GeneratedDailyCallPlanReport> {
   return withTransaction(async (client) => {
-    await validateReportGenerationTransaction(client, input);
+    const existingReportId = await validateReportGenerationTransaction(client, input);
 
     const flexWip = await findFlexWipRecordsByBatchId(
       client,
@@ -123,16 +123,20 @@ export async function generateDailyCallPlanReport(
     });
     const duplicateTicketCount = countDuplicateTickets(rows);
     const unmatchedTicketCount = countUnmatchedRows(rows);
-    const reportId = await createDailyCallPlanReport(client, input, {
-      totalRows: rows.length,
-      duplicateTicketCount,
-      unmatchedTicketCount,
-    });
+    
+    let reportId = existingReportId;
+    if (!reportId) {
+      reportId = await createDailyCallPlanReport(client, input, {
+        totalRows: rows.length,
+        duplicateTicketCount,
+        unmatchedTicketCount,
+      });
 
-    await insertDailyCallPlanReportRows(client, reportId, rows);
+      await insertDailyCallPlanReportRows(client, reportId, rows);
+    }
 
     return {
-      reportId,
+      reportId: reportId as string,
       reportDate: input.reportDate,
       columns: DAILY_CALL_PLAN_COLUMNS,
       totalRows: rows.length,

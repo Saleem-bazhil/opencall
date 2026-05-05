@@ -27,6 +27,13 @@ async function apply() {
     `);
     console.log("Migration 003 applied.");
 
+    console.log("Applying migration 004...");
+    const fs = await import("fs");
+    const path = await import("path");
+    const migration004 = fs.readFileSync(path.join(process.cwd(), "../../infra/postgres/migrations/004_report_history.sql"), "utf-8");
+    await client.query(migration004);
+    console.log("Migration 004 applied.");
+
     console.log("All migrations applied successfully.");
   } catch (error) {
     console.error("Migration failed:", error);

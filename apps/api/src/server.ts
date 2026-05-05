@@ -3,7 +3,7 @@ import { env } from "./config/env.js";
 import { checkDatabaseHealth } from "./services/databaseHealthService.js";
 import { verifyRuntimeSchema } from "./services/runtime/runtimeVerificationService.js";
 
-const app = createApp();
+const app = await createApp();
 
 app.listen(env.PORT, () => {
   console.log(`OpenCall API listening on port ${env.PORT}`);

@@ -6,6 +6,7 @@ import {
 } from "../services/rbac/regionAccessService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { reportGenerationRequestSchema } from "../validators/reportGenerationRequestValidator.js";
+import { updateHistorySessionToCompleted } from "../repositories/historyRepository.js";
 
 export const generateDailyCallPlanReportController: RequestHandler =
   asyncHandler(async (request, response) => {
@@ -24,6 +25,13 @@ export const generateDailyCallPlanReportController: RequestHandler =
       generatedBy: currentUser.id,
       regionId,
     });
+
+    await updateHistorySessionToCompleted(
+      null,
+      body.flexUploadBatchId,
+      report.reportId,
+      report.totalRows
+    ).catch(console.error);
 
     response.status(201).json({
       data: report,

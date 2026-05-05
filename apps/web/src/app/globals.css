@@ -477,3 +477,173 @@ td.missingCell {
     min-width: 0;
   }
 }
+
+/* Report History Panel */
+.reportHistoryPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  width: 100%;
+  height: max-content;
+  max-height: calc(100vh - 44px);
+  overflow: hidden;
+}
+
+.historyHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.historyControls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.historyFilters {
+  display: flex;
+  gap: 8px;
+}
+
+.historyFilters select {
+  flex: 1;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.historyGroup h3 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.historyItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fbfcfd;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  margin-bottom: 8px;
+}
+
+.historyItem:hover {
+  border-color: var(--accent);
+}
+
+.historyItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyItemHeader strong {
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyItemHeader input {
+  font-size: 14px;
+  font-weight: bold;
+  padding: 4px;
+  min-height: 24px;
+  flex: 1;
+}
+
+.historyItemMeta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.historyItemActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.historyItemActions button {
+  min-height: 24px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.historyItemActions button:hover {
+  background: var(--border);
+}
+
+.historyItemActions .deleteBtn {
+  color: var(--danger);
+}
+
+.historyItemActions .deleteBtn:hover {
+  background: #fff2f1;
+  border-color: #efb6b2;
+}
+
+.statusBadge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+}
+
+.statusBadge.completed {
+  background: #e7f6ef;
+  color: var(--success);
+}
+
+.statusBadge.draft {
+  background: #fff3dd;
+  color: var(--warning);
+}
+
+.noHistory {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  margin: 32px 0;
+}
+
+@media (max-width: 1200px) {
+  .reportHistoryPanel {
+    position: fixed;
+    right: 0;
+    top: 72px;
+    bottom: 0;
+    z-index: 50;
+    border-radius: 0;
+    max-height: calc(100vh - 72px);
+    box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+  }
+}

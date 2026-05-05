@@ -16,7 +16,13 @@ import {
   type RuntimeHealthResponse,
   type UploadBatch,
   type UploadResponse,
+  type ReportHistorySession,
+  getReportHistory,
+  getReportHistoryById,
+  renameReportHistory,
+  deleteReportHistory,
 } from "../lib/apiClient";
+import { ReportHistoryPanel } from "../components/ReportHistoryPanel";
 import { downloadReportAsXlsx, downloadReportAsExcel } from "../lib/excelExport";
 
 type SourceKey = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
@@ -114,6 +120,9 @@ export default function DashboardPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [selectedPreviewCategory, setSelectedPreviewCategory] = useState<string | null>(null);
 
+  const [historySessions, setHistorySessions] = useState<ReportHistorySession[]>([]);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+
   const selectedRecords = useMemo(() => {
     if (!preview || !selectedPreviewCategory) return null;
     const { enrichedRows } = preview;
@@ -180,6 +189,14 @@ export default function DashboardPage() {
     void refreshHealth();
   }, []);
 
+  useEffect(() => {
+    if (session) {
+      getReportHistory(session.token).then(setHistorySessions).catch(console.error);
+    } else {
+      setHistorySessions([]);
+    }
+  }, [session]);
+
   async function runAction(action: () => Promise<void>) {
     setIsBusy(true);
     setMessage(null);
@@ -234,6 +251,9 @@ export default function DashboardPage() {
       setReport(null);
       setEditingSerialNo(null);
       setDraftOutput({});
+      
+      // Refresh history to get the draft
+      getReportHistory(session.token).then(setHistorySessions).catch(console.error);
     });
   }
 
@@ -272,6 +292,9 @@ export default function DashboardPage() {
       );
       setEditingSerialNo(null);
       setDraftOutput({});
+      
+      // Refresh history to see completed status
+      getReportHistory(session.token).then(setHistorySessions).catch(console.error);
     });
   }
 
@@ -285,6 +308,78 @@ export default function DashboardPage() {
     setEditingSerialNo(null);
     setDraftOutput({});
     setSelectedPreviewCategory(null);
+  }
+
+  async function handleHistoryOpen(historySession: ReportHistorySession) {
+    if (!session) return;
+    await runAction(async () => {
+      const detail = await getReportHistoryById(session.token, historySession.id);
+      
+      // Create mock batch objects so frontend can use batchIds
+      const mockBatches: UploadBatch[] = [];
+      if (detail.flexUploadBatchId) {
+        mockBatches.push({ id: detail.flexUploadBatchId, sourceType: "FLEX_WIP", originalFileName: "", status: "PROCESSED", rowCount: 0, errorCount: 0, createdAt: detail.createdAt });
+      }
+      if (detail.renderwaysUploadBatchId) {
+        mockBatches.push({ id: detail.renderwaysUploadBatchId, sourceType: "RENDERWAYS", originalFileName: "", status: "PROCESSED", rowCount: 0, errorCount: 0, createdAt: detail.createdAt });
+      }
+      if (detail.callPlanUploadBatchId) {
+        mockBatches.push({ id: detail.callPlanUploadBatchId, sourceType: "CALL_PLAN", originalFileName: "", status: "PROCESSED", rowCount: 0, errorCount: 0, createdAt: detail.createdAt });
+      }
+      
+      // We restore the state. If it's DRAFT, we only have the batches.
+      // We can trigger a preview automatically.
+      setUpload({ batches: mockBatches, validations: [], parseSummaries: [] });
+      setPreview(null);
+      setReport(null);
+      setEditingSerialNo(null);
+      setDraftOutput({});
+      setFiles({});
+      if (detail.regionId) setRegionId(detail.regionId);
+      
+      // Fetch preview and report if applicable
+      const prev = await previewMatches({
+        token: session.token,
+        regionId: detail.regionId || regionId,
+        flexUploadBatchId: detail.flexUploadBatchId!,
+        ...(detail.renderwaysUploadBatchId ? { renderwaysUploadBatchId: detail.renderwaysUploadBatchId } : {}),
+        ...(detail.callPlanUploadBatchId ? { callPlanUploadBatchId: detail.callPlanUploadBatchId } : {}),
+      });
+      setPreview(prev);
+
+      // If it's completed, we could ideally fetch the report.
+      // But since we don't have a getReport API, we'll just re-generate it to restore view
+      if (detail.status === "COMPLETED") {
+         const rep = await generateReport({
+           token: session.token,
+           regionId: detail.regionId || regionId,
+           reportDate: detail.createdAt.slice(0, 10),
+           flexUploadBatchId: detail.flexUploadBatchId!,
+           ...(detail.renderwaysUploadBatchId ? { renderwaysUploadBatchId: detail.renderwaysUploadBatchId } : {}),
+           ...(detail.callPlanUploadBatchId ? { callPlanUploadBatchId: detail.callPlanUploadBatchId } : {}),
+         });
+         setReport(rep);
+      }
+      
+      if (window.innerWidth < 768) {
+        setIsHistoryPanelOpen(false);
+      }
+    });
+  }
+
+  async function handleHistoryRename(historySession: ReportHistorySession, newTitle: string) {
+    if (!session) return;
+    await renameReportHistory(session.token, historySession.id, newTitle).catch(console.error);
+    getReportHistory(session.token).then(setHistorySessions).catch(console.error);
+  }
+
+
+
+  async function handleHistoryDelete(historySession: ReportHistorySession) {
+    if (!session) return;
+    if (!window.confirm("Are you sure you want to delete this session?")) return;
+    await deleteReportHistory(session.token, historySession.id).catch(console.error);
+    getReportHistory(session.token).then(setHistorySessions).catch(console.error);
   }
 
   const canUseBatches = Boolean(batchIds.flexUploadBatchId);
@@ -357,12 +452,17 @@ export default function DashboardPage() {
           <button className="iconButton" type="button" onClick={() => void refreshHealth()}>
             Refresh
           </button>
+          {session && (
+            <button className="iconButton" type="button" onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}>
+              {isHistoryPanelOpen ? "Close History" : "History"}
+            </button>
+          )}
         </div>
       </header>
 
       {message ? <div className="alert">{message}</div> : null}
 
-      <section className="workspace">
+      <section className={`workspace ${session && isHistoryPanelOpen ? "withHistory" : ""}`}>
         <aside className="sidebar">
           <form className="panel" onSubmit={(event) => void handleLogin(event)}>
             <h2>Access</h2>
@@ -408,6 +508,15 @@ export default function DashboardPage() {
               />
             </label>
           </div>
+
+          {session && isHistoryPanelOpen && (
+            <ReportHistoryPanel 
+              sessions={historySessions}
+              onOpen={handleHistoryOpen}
+              onRename={handleHistoryRename}
+              onDelete={handleHistoryDelete}
+            />
+          )}
         </aside>
 
         <section className="mainGrid">
@@ -677,7 +786,7 @@ export default function DashboardPage() {
                                            }}
                                          >
                                         <option value="">{MANUAL_ENTRY_REQUIRED}</option>
-                                        {RTPL_STATUS_OPTIONS.filter((opt) => opt !== "Custom").map((option) => (
+                                        {RTPL_STATUS_OPTIONS.map((option) => (
                                           <option key={option} value={option}>
                                             {option}
                                           </option>

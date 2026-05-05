@@ -233,3 +233,59 @@ export async function generateReport(input: {
 
   return readJson<GeneratedReportResponse>(response);
 }
+
+export interface ReportHistorySession {
+  id: string;
+  title: string;
+  status: "DRAFT" | "COMPLETED";
+  regionId: string | null;
+  flexUploadBatchId: string | null;
+  renderwaysUploadBatchId: string | null;
+  callPlanUploadBatchId: string | null;
+  reportId: string | null;
+  totalRows: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getReportHistory(token: string): Promise<ReportHistorySession[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-history`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return readJson<ReportHistorySession[]>(response);
+}
+
+export async function getReportHistoryById(token: string, id: string): Promise<ReportHistorySession> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-history/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return readJson<ReportHistorySession>(response);
+}
+
+export async function renameReportHistory(token: string, id: string, title: string): Promise<{ id: string; title: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-history/${id}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title }),
+  });
+  return readJson<{ id: string; title: string }>(response);
+}
+
+export async function duplicateReportHistory(token: string, id: string): Promise<{ id: string; title: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-history/${id}/duplicate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return readJson<{ id: string; title: string }>(response);
+}
+
+export async function deleteReportHistory(token: string, id: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-history/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return readJson<{ success: boolean }>(response);
+}
