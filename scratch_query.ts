@@ -1,23 +1,15 @@
 import { query, closeDatabasePool } from './apps/api/src/config/database.js';
 
+import fs from 'node:fs';
+import { query, closeDatabasePool } from './apps/api/src/config/database.js';
+
 async function run() {
   try {
-    const regionId = "";
-    const result = await query(
-      `
-      SELECT pincode, area_name
-      FROM pincode_area_mappings
-      WHERE NULLIF($1, '')::uuid IS NULL
-         OR region_id IS NULL
-         OR region_id = NULLIF($1, '')::uuid
-      ORDER BY region_id NULLS LAST
-      LIMIT 5
-      `,
-      [regionId]
-    );
-    console.log(result.rows);
+    const sql = fs.readFileSync('../../infra/postgres/migrations/004_report_history_sessions.sql', 'utf8');
+    const result = await query(sql);
+    console.log("Migration executed successfully:", result);
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error executing migration:", error);
   } finally {
     await closeDatabasePool();
   }

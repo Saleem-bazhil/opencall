@@ -191,7 +191,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (session) {
-      getReportHistory(session.token).then(setHistorySessions).catch(console.error);
+      getReportHistory(session.token).then(setHistorySessions).catch((error) => {
+        if (error instanceof Error && (error.message.includes("expired") || error.message.includes("Invalid bearer") || error.message.includes("unauthorized") || error.message.includes("failed 401"))) {
+          handleLogout();
+          setMessage("Session expired, please login again.");
+        } else {
+          console.error(error);
+        }
+      });
     } else {
       setHistorySessions([]);
     }
@@ -204,7 +211,12 @@ export default function DashboardPage() {
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Operation failed");
+      if (error instanceof Error && (error.message.includes("expired") || error.message.includes("Invalid bearer") || error.message.includes("unauthorized") || error.message.includes("failed 401"))) {
+        handleLogout();
+        setMessage("Session expired, please login again.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "Operation failed");
+      }
     } finally {
       setIsBusy(false);
     }
