@@ -11,6 +11,7 @@ export const DAILY_CALL_PLAN_COLUMNS = [
   "Engineer",
   "Product",
   "Product Line Name",
+  "Work Location",
   "Flex Status",
   "HP Owner Status",
   "WO OTC CODE",

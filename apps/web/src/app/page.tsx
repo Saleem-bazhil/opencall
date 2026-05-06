@@ -236,6 +236,38 @@ export default function DashboardPage() {
 
   const [historySessions, setHistorySessions] = useState<ReportHistorySession[]>([]);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [selectedWoOtcCode, setSelectedWoOtcCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedRegion(null);
+    setSelectedWoOtcCode(null);
+  }, [report?.reportId]);
+
+  const filteredRows = useMemo(() => {
+    if (!report) return [];
+    
+    return report.rows.filter((row) => {
+      const matchRegion = selectedRegion === "ALL" || !selectedRegion || row.output["Work Location"] === selectedRegion;
+      const matchCode = !selectedWoOtcCode || row.output["WO OTC CODE"] === selectedWoOtcCode;
+      return matchRegion && matchCode;
+    });
+  }, [report, selectedRegion, selectedWoOtcCode]);
+
+  const overallWoOtcBreakdown = useMemo(() => {
+    if (!report) return [];
+    const counts = new Map<string, number>();
+    for (const entry of report.regionBreakdown) {
+      if (entry.woOtcCodeBreakdown) {
+        for (const wo of entry.woOtcCodeBreakdown) {
+          counts.set(wo.code, (counts.get(wo.code) || 0) + wo.count);
+        }
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+  }, [report]);
 
   const selectedRecords = useMemo(() => {
     if (!preview || !selectedPreviewCategory) return null;
@@ -823,6 +855,114 @@ export default function DashboardPage() {
                 </p>
               ) : null}
               <ComparisonSummaryPanel report={report} />
+
+              <div className="regionBreakdownSection">
+                <div className="sectionHeader">
+                  <h3>Region-wise Breakdown</h3>
+                  {selectedRegion && (
+                    <button 
+                      className="secondaryButton" 
+                      onClick={() => {
+                        setSelectedRegion(null);
+                        setSelectedWoOtcCode(null);
+                      }}
+                      style={{ minHeight: '32px', padding: '0 12px', fontSize: '12px' }}
+                    >
+                      Show All Regions
+                    </button>
+                  )}
+                </div>
+                <div className="regionGrid">
+                  <div 
+                    className={`regionMetric ${selectedRegion === "ALL" && !selectedWoOtcCode ? "active" : ""}`}
+                    onClick={() => {
+                      if (selectedRegion === "ALL" && !selectedWoOtcCode) {
+                        setSelectedRegion(null);
+                      } else {
+                        setSelectedRegion("ALL");
+                        setSelectedWoOtcCode(null);
+                      }
+                    }}
+                    style={{ cursor: "pointer", border: "2px solid var(--accent)", background: "rgba(18, 143, 143, 0.05)" }}
+                  >
+                    <div className="regionMetricHeader">
+                      <div className="regionMetricValue">{report.rows.length}</div>
+                      <div className="regionMetricLabel">ALL REGIONS</div>
+                      <div className="regionMetricSubtext">GLOBAL</div>
+                    </div>
+                    
+                    {overallWoOtcBreakdown.length > 0 && (
+                      <div className="regionWoOtcList">
+                        {overallWoOtcBreakdown.map(woCode => (
+                          <div 
+                            key={woCode.code}
+                            className={`regionWoOtcItem ${(selectedRegion === "ALL" || !selectedRegion) && selectedWoOtcCode === woCode.code ? "active" : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if ((selectedRegion === "ALL" || !selectedRegion) && selectedWoOtcCode === woCode.code) {
+                                setSelectedWoOtcCode(null);
+                                setSelectedRegion(null);
+                              } else {
+                                setSelectedRegion("ALL");
+                                setSelectedWoOtcCode(woCode.code);
+                              }
+                            }}
+                          >
+                            <span className="regionWoOtcCode">{woCode.code}</span>
+                            <span className="regionWoOtcCount">{woCode.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {report.regionBreakdown.map((entry) => (
+                    <div 
+                      key={entry.aspCode} 
+                      className={`regionMetric ${selectedRegion === entry.aspCode && !selectedWoOtcCode ? "active" : ""}`}
+                      onClick={() => {
+                        if (selectedRegion === entry.aspCode && !selectedWoOtcCode) {
+                          setSelectedRegion(null);
+                        } else {
+                          setSelectedRegion(entry.aspCode);
+                          setSelectedWoOtcCode(null);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className="regionMetricHeader">
+                        <div className="regionMetricValue">{entry.count}</div>
+                        <div className="regionMetricLabel">{entry.regionName}</div>
+                        <div className="regionMetricSubtext">{entry.aspCode}</div>
+                      </div>
+                      
+                      {entry.woOtcCodeBreakdown && entry.woOtcCodeBreakdown.length > 0 && (
+                        <div className="regionWoOtcList">
+                          {entry.woOtcCodeBreakdown.map(woCode => (
+                            <div 
+                              key={woCode.code}
+                              className={`regionWoOtcItem ${selectedRegion === entry.aspCode && selectedWoOtcCode === woCode.code ? "active" : ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (selectedRegion === entry.aspCode && selectedWoOtcCode === woCode.code) {
+                                  // Deselect WO code, but keep region selected
+                                  setSelectedWoOtcCode(null);
+                                } else {
+                                  setSelectedRegion(entry.aspCode);
+                                  setSelectedWoOtcCode(woCode.code);
+                                }
+                              }}
+                            >
+                              <span className="regionWoOtcCode">{woCode.code}</span>
+                              <span className="regionWoOtcCount">{woCode.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="downloadActions">
                 <button
                   className="downloadBtn excelBtn"
@@ -849,7 +989,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {report.rows.map((row) => {
+                    {filteredRows.map((row) => {
                       const isEditing = editingSerialNo === row.serialNo;
 
                       return (

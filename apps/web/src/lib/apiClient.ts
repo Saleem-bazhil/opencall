@@ -98,6 +98,15 @@ export interface GeneratedReportResponse {
       previous: string[];
     };
   };
+  regionBreakdown: Array<{
+    aspCode: string;
+    regionName: string;
+    count: number;
+    woOtcCodeBreakdown: Array<{
+      code: string;
+      count: number;
+    }>;
+  }>;
   rows: Array<{
     serialNo: number;
     output: Record<string, string | number>;

@@ -34,6 +34,7 @@ export function formatDailyCallPlanRow(
     Engineer: valueOrManual(row.engineer),
     Product: valueOrEmpty(row.product),
     "Product Line Name": valueOrEmpty(row.product_line_name),
+    "Work Location": valueOrEmpty(row.work_location),
     "Flex Status": valueOrEmpty(row.flex_status),
     "HP Owner Status": valueOrManual(row.hp_owner_status),
     "WO OTC CODE": valueOrManual(row.wo_otc_code),

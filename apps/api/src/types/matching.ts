@@ -42,6 +42,7 @@ export interface EnrichedCallPlanRow {
   engineer: string | null;
   product: string | null;
   product_line_name: string | null;
+  work_location: string | null;
   flex_status: string | null;
   hp_owner_status: string | null;
   wo_otc_code: string | null;

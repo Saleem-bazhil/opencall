@@ -58,8 +58,7 @@ function countDuplicateTickets(rows: readonly GeneratedDailyCallPlanRow[]): numb
 
     counts.set(ticketId, (counts.get(ticketId) ?? 0) + 1);
   }
-
-  return Array.from(counts.values()).filter((count) => count > 1).length;
+  return Array.from(counts.values()).filter((count) => count > 1).length;
 }
 
 function countUnmatchedRows(
@@ -75,6 +74,64 @@ function countUnmatchedRows(
   return rows.filter((row) =>
     unmatchedStatuses.has(row.enriched.match_status),
   ).length;
+}
+
+const ASP_CODE_REGION_MAP: Record<string, string> = {
+  ASPS01461: "CHENNAI",
+  ASPS01463: "VELLORE",
+  ASPS01465: "SALEM",
+  ASPS01489: "KANCHIPURAM",
+  ASPS01511: "HOSUR",
+};
+
+function computeRegionBreakdown(
+  rows: readonly GeneratedDailyCallPlanRow[],
+): import("../../types/reportGeneration.js").RegionBreakdownEntry[] {
+  const regionMap = new Map<string, { count: number; woOtcCodes: Map<string, number> }>();
+
+  for (const row of rows) {
+    let aspCode = (row.enriched.work_location || "").trim().toUpperCase();
+    if (!aspCode) {
+      aspCode = "UNKNOWN";
+    }
+
+    let woCode = (row.enriched.wo_otc_code || "").trim();
+    if (!woCode) {
+      woCode = "Unspecified";
+    }
+
+    let regionData = regionMap.get(aspCode);
+    if (!regionData) {
+      regionData = { count: 0, woOtcCodes: new Map() };
+      regionMap.set(aspCode, regionData);
+    }
+
+    regionData.count++;
+    regionData.woOtcCodes.set(woCode, (regionData.woOtcCodes.get(woCode) ?? 0) + 1);
+  }
+
+  const breakdown = Array.from(regionMap.entries()).map(([aspCode, data]) => {
+    const woOtcCodeBreakdown = Array.from(data.woOtcCodes.entries())
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+
+    return {
+      aspCode,
+      regionName: ASP_CODE_REGION_MAP[aspCode] ?? "Unknown Region",
+      count: data.count,
+      woOtcCodeBreakdown,
+    };
+  });
+
+  // Sort descending by count, then alphabetically by region name
+  breakdown.sort((a, b) => {
+    if (b.count !== a.count) {
+      return b.count - a.count;
+    }
+    return a.regionName.localeCompare(b.regionName);
+  });
+
+  return breakdown;
 }
 
 function toComparableReportRow(
@@ -321,6 +378,7 @@ export async function generateDailyCallPlanReport(
       unmatchedTicketCount,
       duplicateTracking,
       comparison,
+      regionBreakdown: computeRegionBreakdown(rows),
       rows,
     };
   });

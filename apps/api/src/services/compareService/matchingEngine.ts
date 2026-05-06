@@ -245,6 +245,7 @@ function buildEnrichedRow(
     engineer: callPlan?.engineer ?? null,
     product: flexWip?.product ?? null,
     product_line_name: flexWip?.productLineName ?? null,
+    work_location: flexWip?.workLocation ?? null,
     flex_status: flexWip?.flexStatus ?? null,
     hp_owner_status: renderways?.hpOwner ?? null,
     wo_otc_code: flexWip?.woOtcCode ?? null,

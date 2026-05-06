@@ -21,6 +21,7 @@ interface FlexWipRecordRow {
   part_description: string | null;
   customer_pincode: string | null;
   product_line_name: string | null;
+  work_location: string | null;
   raw_row: Record<string, unknown>;
   row_number: number;
 }
@@ -78,12 +79,13 @@ export async function insertFlexWipRecords(
           part_description,
           customer_pincode,
           product_line_name,
+          work_location,
           raw_row,
           row_number
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9,
-          $10, $11, $12, $13, $14, $15, $16::jsonb, $17
+          $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18
         )
       `,
       [
@@ -102,6 +104,7 @@ export async function insertFlexWipRecords(
         record.partDescription,
         record.customerPincode,
         record.productLineName,
+        record.workLocation,
         JSON.stringify(record.rawRow),
         record.rowNumber,
       ],
@@ -216,6 +219,7 @@ export async function findFlexWipRecordsByBatchId(
         part_description,
         customer_pincode,
         product_line_name,
+        work_location,
         raw_row,
         row_number
       FROM flex_wip_records
@@ -241,6 +245,7 @@ export async function findFlexWipRecordsByBatchId(
     partDescription: row.part_description,
     customerPincode: row.customer_pincode,
     productLineName: row.product_line_name,
+    workLocation: row.work_location,
     rawRow: row.raw_row,
     rowNumber: row.row_number,
   }));

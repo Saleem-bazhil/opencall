@@ -40,6 +40,16 @@ export interface GeneratedReportComparisonMetadata {
   };
 }
 
+export interface RegionBreakdownEntry {
+  aspCode: string;
+  regionName: string;
+  count: number;
+  woOtcCodeBreakdown: Array<{
+    code: string;
+    count: number;
+  }>;
+}
+
 export interface GeneratedDailyCallPlanReport {
   reportId: string;
   sessionId: string;
@@ -50,5 +60,6 @@ export interface GeneratedDailyCallPlanReport {
   unmatchedTicketCount: number;
   duplicateTracking: DuplicateTrackingSummary;
   comparison: GeneratedReportComparisonMetadata;
+  regionBreakdown: RegionBreakdownEntry[];
   rows: GeneratedDailyCallPlanRow[];
 }
