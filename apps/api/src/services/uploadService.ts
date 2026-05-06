@@ -86,6 +86,7 @@ function buildParseSummary(upload: ParsedUpload): ParsedUploadSummary {
     issueCount: upload.parsed.issues.length,
     duplicateNormalizedTicketIds: upload.parsed.duplicateNormalizedTicketIds,
     duplicateNormalizedCaseIds: upload.parsed.duplicateNormalizedCaseIds,
+    duplicateCount: upload.parsed.duplicateCount,
   };
 }
 

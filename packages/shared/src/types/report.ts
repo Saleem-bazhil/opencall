@@ -1,3 +1,8 @@
+import type {
+  ReportChangedFields,
+  ReportChangeType,
+} from "./reportComparison.js";
+
 export type UploadSourceType = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
 
 export type DailyCallPlanSegment = "PC" | "Print" | "Install" | "";
@@ -24,4 +29,10 @@ export interface DailyCallPlanRow {
   tat: string | null;
   customerMail: string | null;
   rca: string | null;
+  changeType?: ReportChangeType | null;
+  previousFlexStatus?: string | null;
+  previousRtplStatus?: string | null;
+  previousWipAging?: string | null;
+  changedFields?: ReportChangedFields;
+  changeSummary?: string | null;
 }

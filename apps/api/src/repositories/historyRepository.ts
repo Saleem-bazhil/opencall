@@ -79,6 +79,100 @@ export async function updateHistorySessionToCompleted(
   return result.rows[0] ?? null;
 }
 
+export async function findOrCreateCompletedHistorySessionForReport(
+  client: PoolClient,
+  session: {
+    userId: string;
+    title: string;
+    regionId?: string | null;
+    flexUploadBatchId: string;
+    renderwaysUploadBatchId?: string | null;
+    callPlanUploadBatchId?: string | null;
+    dailyCallPlanReportId: string;
+    totalRows: number;
+  },
+): Promise<ReportHistorySessionRow> {
+  const updateResult = await client.query<ReportHistorySessionRow>(
+    `
+      WITH candidate AS (
+        SELECT id
+        FROM report_history_sessions
+        WHERE user_id = $1
+          AND flex_upload_batch_id = $4
+          AND renderways_upload_batch_id IS NOT DISTINCT FROM $5
+          AND call_plan_upload_batch_id IS NOT DISTINCT FROM $6
+        ORDER BY
+          CASE WHEN status = 'DRAFT' THEN 0 ELSE 1 END,
+          updated_at DESC,
+          id ASC
+        LIMIT 1
+        FOR UPDATE
+      )
+      UPDATE report_history_sessions sessions
+      SET
+        title = COALESCE(NULLIF(sessions.title, ''), $2),
+        status = 'COMPLETED',
+        region_id = $3,
+        daily_call_plan_report_id = $7,
+        total_rows = $8,
+        updated_at = NOW()
+      FROM candidate
+      WHERE sessions.id = candidate.id
+      RETURNING sessions.*;
+    `,
+    [
+      session.userId,
+      session.title,
+      session.regionId ?? null,
+      session.flexUploadBatchId,
+      session.renderwaysUploadBatchId ?? null,
+      session.callPlanUploadBatchId ?? null,
+      session.dailyCallPlanReportId,
+      session.totalRows,
+    ],
+  );
+
+  const updated = updateResult.rows[0];
+  if (updated) {
+    return updated;
+  }
+
+  const insertResult = await client.query<ReportHistorySessionRow>(
+    `
+      INSERT INTO report_history_sessions (
+        user_id,
+        title,
+        status,
+        region_id,
+        flex_upload_batch_id,
+        renderways_upload_batch_id,
+        call_plan_upload_batch_id,
+        daily_call_plan_report_id,
+        total_rows
+      )
+      VALUES ($1, $2, 'COMPLETED', $3, $4, $5, $6, $7, $8)
+      RETURNING *;
+    `,
+    [
+      session.userId,
+      session.title,
+      session.regionId ?? null,
+      session.flexUploadBatchId,
+      session.renderwaysUploadBatchId ?? null,
+      session.callPlanUploadBatchId ?? null,
+      session.dailyCallPlanReportId,
+      session.totalRows,
+    ],
+  );
+
+  const inserted = insertResult.rows[0];
+  if (!inserted) {
+    throw new Error("Failed to create completed history session");
+  }
+
+  return inserted;
+}
+
 export async function getHistorySessionsByUser(
   userId: string,
 ): Promise<ReportHistorySessionRow[]> {

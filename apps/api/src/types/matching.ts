@@ -17,6 +17,13 @@ export interface SourceDuplicateSummary {
   duplicateNormalizedCaseIds: string[];
 }
 
+export interface DuplicateTrackingSummary {
+  flexWip: number;
+  renderways: number;
+  callPlan: number;
+  total: number;
+}
+
 export interface MatchedCallPlanInput {
   renderways: readonly RenderwaysParsedRecord[];
   flexWip: readonly FlexWipParsedRecord[];

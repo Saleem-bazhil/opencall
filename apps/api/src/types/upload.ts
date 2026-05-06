@@ -46,4 +46,5 @@ export interface ParsedUploadSummary {
   issueCount: number;
   duplicateNormalizedTicketIds: string[];
   duplicateNormalizedCaseIds: string[];
+  duplicateCount: number;
 }

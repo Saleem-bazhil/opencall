@@ -26,6 +26,8 @@ const REQUIRED_TABLES = [
   "sla_rules",
   "daily_call_plan_reports",
   "daily_call_plan_report_rows",
+  "report_comparisons",
+  "report_row_diffs",
 ] as const;
 
 const REQUIRED_COLUMNS: readonly RequiredColumn[] = [
@@ -49,6 +51,15 @@ const REQUIRED_COLUMNS: readonly RequiredColumn[] = [
   { tableName: "daily_call_plan_reports", columnName: "report_date" },
   { tableName: "daily_call_plan_report_rows", columnName: "match_status" },
   { tableName: "daily_call_plan_report_rows", columnName: "match_notes" },
+  { tableName: "daily_call_plan_report_rows", columnName: "change_type" },
+  { tableName: "daily_call_plan_report_rows", columnName: "changed_fields" },
+  { tableName: "daily_call_plan_report_rows", columnName: "change_summary" },
+  { tableName: "report_comparisons", columnName: "current_session_id" },
+  { tableName: "report_comparisons", columnName: "previous_session_id" },
+  { tableName: "report_comparisons", columnName: "summary_json" },
+  { tableName: "report_row_diffs", columnName: "ticket_id" },
+  { tableName: "report_row_diffs", columnName: "change_type" },
+  { tableName: "report_row_diffs", columnName: "changed_fields" },
 ];
 
 export async function verifyRuntimeSchema(): Promise<RuntimeVerificationResult> {

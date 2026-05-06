@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 
 export function downloadReportAsExcel(report: GeneratedReportResponse): void {
   // Build CSV content (works without any library)
-  const headers = DAILY_CALL_PLAN_COLUMNS;
+  const headers = ["Change Type", "Change Summary", ...DAILY_CALL_PLAN_COLUMNS];
 
   const escapeCSV = (value: string | number | null | undefined): string => {
     const str = String(value ?? "");
@@ -18,7 +18,11 @@ export function downloadReportAsExcel(report: GeneratedReportResponse): void {
   csvRows.push(headers.map(escapeCSV).join(","));
 
   for (const row of report.rows) {
-    const values = headers.map((col) => escapeCSV(row.output[col]));
+    const values = [
+      escapeCSV(row.comparison?.changeType ?? ""),
+      escapeCSV(row.comparison?.changeSummary ?? ""),
+      ...DAILY_CALL_PLAN_COLUMNS.map((col) => escapeCSV(row.output[col])),
+    ];
     csvRows.push(values.join(","));
   }
 
@@ -37,14 +41,18 @@ export function downloadReportAsExcel(report: GeneratedReportResponse): void {
 }
 
 export function downloadReportAsXlsx(report: GeneratedReportResponse): void {
-  const headers = DAILY_CALL_PLAN_COLUMNS;
+  const headers = ["Change Type", "Change Summary", ...DAILY_CALL_PLAN_COLUMNS];
 
   // Build a 2D array: headers + data rows
   const data: (string | number)[][] = [];
   data.push([...headers]);
 
   for (const row of report.rows) {
-    const values = headers.map((col) => row.output[col] ?? "");
+    const values = [
+      row.comparison?.changeType ?? "",
+      row.comparison?.changeSummary ?? "",
+      ...DAILY_CALL_PLAN_COLUMNS.map((col) => row.output[col] ?? ""),
+    ];
     data.push(values);
   }
 

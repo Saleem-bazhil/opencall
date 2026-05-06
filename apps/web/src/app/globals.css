@@ -334,6 +334,53 @@ code {
   font-size: 18px;
 }
 
+.comparisonPanel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 14px;
+}
+
+.comparisonPanel.skipped {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.comparisonPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comparisonPanel h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.comparisonPanel p {
+  margin: 4px 0 0;
+  max-width: 680px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comparisonMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.comparisonMetricGrid .metric strong {
+  font-size: 18px;
+}
+
 .hint {
   margin: -8px 0 18px;
   color: var(--muted);
@@ -379,6 +426,109 @@ td {
   font-size: 13px;
 }
 
+.changeCell {
+  min-width: 112px;
+  overflow: visible;
+}
+
+.changeTooltipWrap {
+  position: relative;
+  display: inline-flex;
+  outline: none;
+}
+
+.changeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.changeBadge.new {
+  background: #e8f7ff;
+  color: #05668d;
+}
+
+.changeBadge.closed {
+  background: #fff2f1;
+  color: var(--danger);
+}
+
+.changeBadge.updated {
+  background: #fff3dd;
+  color: var(--warning);
+}
+
+.changeBadge.carried {
+  background: #e7f6ef;
+  color: var(--success);
+}
+
+.changeBadge.none {
+  background: var(--surface-subtle);
+  color: var(--muted);
+}
+
+.changeTooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: none;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 48px));
+  border: 1px solid #c4ccd6;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  padding: 10px;
+  white-space: normal;
+}
+
+.changeTooltipWrap:hover .changeTooltip,
+.changeTooltipWrap:focus .changeTooltip,
+.changeTooltipWrap:focus-within .changeTooltip {
+  display: grid;
+  gap: 8px;
+}
+
+.changeTooltip strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.changeTooltipList {
+  display: grid;
+  gap: 6px;
+}
+
+.changeTooltipList > span {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 12px;
+}
+
+.changeTooltipList b {
+  color: var(--muted);
+}
+
+.changeTooltipMuted,
+.changeTooltipPrevious {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .incompleteRow td {
   background: #fffdf6;
 }
@@ -412,7 +562,8 @@ td.missingCell {
 
   .fileGrid,
   .batchGrid,
-  .metricGrid {
+  .metricGrid,
+  .comparisonMetricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -472,9 +623,21 @@ td.missingCell {
   .fileGrid,
   .batchGrid,
   .metricGrid,
+  .comparisonMetricGrid,
   .reportStats {
     grid-template-columns: 1fr;
     min-width: 0;
+  }
+
+  .comparisonPanel.skipped,
+  .comparisonPanelHeader {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .comparisonPanel p {
+    white-space: normal;
   }
 }
 

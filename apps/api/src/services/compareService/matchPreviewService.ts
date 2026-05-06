@@ -12,12 +12,17 @@ import {
 import { assertCanAccessBatchRegions } from "../rbac/regionAccessService.js";
 import type { AuthenticatedUser } from "../../types/auth.js";
 import type {
+  DuplicateTrackingSummary,
   EnrichedCallPlanRow,
   MatchedCallPlanRecord,
   MatchStatus,
 } from "../../types/matching.js";
 import { unprocessableEntity } from "../../utils/httpError.js";
 import { matchSourceRecords } from "./matchingEngine.js";
+import {
+  dedupeRowsByTicket,
+  findDuplicateTicketKeys,
+} from "../normalization/dedupeRowsByTicket.js";
 
 export interface MatchPreviewInput {
   flexUploadBatchId: string;
@@ -34,9 +39,23 @@ export interface MatchPreviewResult {
   callPlanMatchedRows: number;
   unmatchedFlexRows: number;
   unmatchedCallPlanRows: number;
+  duplicateTracking: DuplicateTrackingSummary;
   matchStatusCounts: Record<MatchStatus, number>;
   enrichedRows: EnrichedCallPlanRow[];
   matches: MatchedCallPlanRecord[];
+}
+
+function assertNoResidualDuplicates(
+  label: string,
+  rows: Parameters<typeof dedupeRowsByTicket>[0],
+): void {
+  const duplicateTicketKeys = findDuplicateTicketKeys(rows);
+
+  if (duplicateTicketKeys.length > 0) {
+    throw unprocessableEntity(`Duplicate ticket IDs remain after ${label} dedupe`, {
+      duplicateTicketKeys,
+    });
+  }
 }
 
 export async function previewMatches(
@@ -78,6 +97,28 @@ export async function previewMatches(
         )
       : [];
 
+    const dedupedFlexWip = dedupeRowsByTicket(flexWip);
+    const dedupedRenderways = dedupeRowsByTicket(renderways);
+    const dedupedCallPlan = dedupeRowsByTicket(callPlan);
+
+    assertNoResidualDuplicates("Flex WIP", dedupedFlexWip.dedupedRows);
+    assertNoResidualDuplicates("Renderways", dedupedRenderways.dedupedRows);
+    assertNoResidualDuplicates("Call Plan", dedupedCallPlan.dedupedRows);
+
+    const duplicateTracking: DuplicateTrackingSummary = {
+      flexWip: dedupedFlexWip.duplicateCount,
+      renderways: dedupedRenderways.duplicateCount,
+      callPlan: dedupedCallPlan.duplicateCount,
+      total:
+        dedupedFlexWip.duplicateCount +
+        dedupedRenderways.duplicateCount +
+        dedupedCallPlan.duplicateCount,
+    };
+
+    if (duplicateTracking.total > 0) {
+      console.info("[matchPreviewService] Removed duplicate rows before matching", duplicateTracking);
+    }
+
     const slaHoursByWipAgingCategory = await findActiveSlaHoursByCategory(client);
     const areaNameByPincode = await findAreaNameByPincode(
       client,
@@ -85,9 +126,9 @@ export async function previewMatches(
     );
 
     const matches = matchSourceRecords({
-      flexWip,
-      renderways,
-      callPlan,
+      flexWip: dedupedFlexWip.dedupedRows,
+      renderways: dedupedRenderways.dedupedRows,
+      callPlan: dedupedCallPlan.dedupedRows,
       slaHoursByWipAgingCategory,
       areaNameByPincode,
     });
@@ -116,12 +157,13 @@ export async function previewMatches(
     }
 
     return {
-      totalRenderwaysRows: renderways.length,
-      totalFlexRows: flexWip.length,
+      totalRenderwaysRows: dedupedRenderways.dedupedRows.length,
+      totalFlexRows: dedupedFlexWip.dedupedRows.length,
       flexMatchedRows,
       callPlanMatchedRows,
       unmatchedFlexRows: matches.filter((match) => !match.flexWip).length,
-      unmatchedCallPlanRows: flexWip.length - callPlanMatchedRows,
+      unmatchedCallPlanRows: dedupedFlexWip.dedupedRows.length - callPlanMatchedRows,
+      duplicateTracking,
       matchStatusCounts,
       enrichedRows,
       matches,

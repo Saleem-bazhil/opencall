@@ -9,6 +9,7 @@ export interface ParsedSourceFile<TRecord> {
   issues: ParsedRowIssue[];
   duplicateNormalizedTicketIds: string[];
   duplicateNormalizedCaseIds: string[];
+  duplicateCount: number;
 }
 
 export interface FlexWipParsedRecord {

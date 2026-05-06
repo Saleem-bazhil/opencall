@@ -85,13 +85,20 @@ export async function insertDailyCallPlanReportRows(
           tat,
           customer_mail,
           rca,
+          change_type,
+          previous_flex_status,
+          previous_rtpl_status,
+          previous_wip_aging,
+          changed_fields,
+          change_summary,
           match_status,
           match_notes
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8,
           $9, $10, $11, $12, $13, $14, $15, $16,
-          $17, $18, $19, $20, $21, $22, $23, $24::jsonb
+          $17, $18, $19, $20, $21, $22, $23, $24,
+          $25, $26, $27::jsonb, $28, $29, $30::jsonb
         )
       `,
       [
@@ -117,6 +124,12 @@ export async function insertDailyCallPlanReportRows(
         row.enriched.tat,
         row.enriched.customer_mail,
         row.enriched.rca,
+        row.comparison?.changeType ?? null,
+        row.comparison?.previousFlexStatus ?? null,
+        row.comparison?.previousRtplStatus ?? null,
+        row.comparison?.previousWipAging ?? null,
+        JSON.stringify(row.comparison?.changedFields ?? {}),
+        row.comparison?.changeSummary ?? null,
         row.enriched.match_status,
         JSON.stringify(row.match.notes),
       ],

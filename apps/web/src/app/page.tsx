@@ -27,6 +27,7 @@ import { downloadReportAsXlsx, downloadReportAsExcel } from "../lib/excelExport"
 
 type SourceKey = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
 type FileField = "flexWipReport" | "renderwaysReport" | "callPlan";
+type ChangeType = "NEW" | "CLOSED" | "CARRIED" | "UPDATED";
 
 const SOURCE_LABELS: Record<SourceKey, string> = {
   FLEX_WIP: "Flex WIP",
@@ -46,6 +47,23 @@ const FILE_FIELDS: Array<{
 ];
 
 const MANUAL_ENTRY_REQUIRED = "Manual Entry Required";
+
+const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
+  NEW: "New",
+  CLOSED: "Closed",
+  UPDATED: "Updated",
+  CARRIED: "Carried",
+};
+
+const CHANGE_FIELD_LABELS: Record<string, string> = {
+  flex_status: "Flex Status",
+  rtpl_status: "RTPL status",
+  wip_aging: "WIP aging",
+  wip_aging_category: "WIP Aging Category",
+  tat: "TAT",
+  engineer: "Engineer",
+  location: "Location",
+};
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -96,6 +114,102 @@ function Metric({
     >
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function formatComparisonValue(value: string | null): string {
+  return value === null || value.trim() === "" ? "blank" : value;
+}
+
+function ChangeTypeBadge({
+  comparison,
+}: Readonly<{
+  comparison: GeneratedReportResponse["rows"][number]["comparison"];
+}>) {
+  const changeType = comparison?.changeType;
+
+  if (!changeType) {
+    return <span className="changeBadge none">Not compared</span>;
+  }
+
+  const entries = Object.entries(comparison.changedFields);
+
+  return (
+    <span className="changeTooltipWrap" tabIndex={0}>
+      <span className={`changeBadge ${changeType.toLowerCase()}`}>
+        {CHANGE_TYPE_LABELS[changeType]}
+      </span>
+      <span className="changeTooltip" role="tooltip">
+        <strong>{comparison.changeSummary ?? CHANGE_TYPE_LABELS[changeType]}</strong>
+        {entries.length > 0 ? (
+          <span className="changeTooltipList">
+            {entries.map(([field, change]) => (
+              <span key={field}>
+                <b>{CHANGE_FIELD_LABELS[field] ?? field}</b>
+                <span>
+                  {formatComparisonValue(change.from)} → {formatComparisonValue(change.to)}
+                </span>
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="changeTooltipMuted">
+            {changeType === "NEW"
+              ? "No previous row"
+              : changeType === "CLOSED"
+                ? "Not present in current report table"
+                : "No field changes"}
+          </span>
+        )}
+        {comparison.previousFlexStatus || comparison.previousRtplStatus || comparison.previousWipAging ? (
+          <span className="changeTooltipPrevious">
+            Prev Flex: {formatComparisonValue(comparison.previousFlexStatus)}
+            {" · "}
+            Prev RTPL: {formatComparisonValue(comparison.previousRtplStatus)}
+            {" · "}
+            Prev WIP: {formatComparisonValue(comparison.previousWipAging)}
+          </span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
+function ComparisonSummaryPanel({
+  report,
+}: Readonly<{
+  report: GeneratedReportResponse;
+}>) {
+  if (report.comparison.skipped || !report.comparison.summary) {
+    return (
+      <div className="comparisonPanel skipped">
+        <div>
+          <h3>Day-over-Day Comparison</h3>
+          <p>No previous-day final report was available for this region.</p>
+        </div>
+        <StatusPill tone="neutral">Skipped</StatusPill>
+      </div>
+    );
+  }
+
+  const summary = report.comparison.summary;
+
+  return (
+    <div className="comparisonPanel">
+      <div className="comparisonPanelHeader">
+        <div>
+          <h3>Day-over-Day Comparison</h3>
+          <p>Compared with session {report.comparison.previousSessionId}</p>
+        </div>
+        <StatusPill tone="good">Compared</StatusPill>
+      </div>
+      <div className="comparisonMetricGrid">
+        <Metric label="New" value={summary.new_count} />
+        <Metric label="Closed" value={summary.closed_count} />
+        <Metric label="Updated" value={summary.updated_count} />
+        <Metric label="Carried" value={summary.carried_count} />
+      </div>
     </div>
   );
 }
@@ -708,6 +822,7 @@ export default function DashboardPage() {
                   Click any highlighted "Manual Entry Required" cell or the row Edit button to enter manual data.
                 </p>
               ) : null}
+              <ComparisonSummaryPanel report={report} />
               <div className="downloadActions">
                 <button
                   className="downloadBtn excelBtn"
@@ -726,6 +841,7 @@ export default function DashboardPage() {
                 <table>
                   <thead>
                     <tr>
+                      <th>Change</th>
                       {DAILY_CALL_PLAN_COLUMNS.map((column) => (
                         <th key={column}>{column}</th>
                       ))}
@@ -745,6 +861,9 @@ export default function DashboardPage() {
                               : undefined
                           }
                         >
+                          <td className="changeCell">
+                            <ChangeTypeBadge comparison={row.comparison} />
+                          </td>
                           {DAILY_CALL_PLAN_COLUMNS.map((column) => {
                             const value = isEditing ? draftOutput[column] : row.output[column];
                             const isManualRequired = value === MANUAL_ENTRY_REQUIRED;

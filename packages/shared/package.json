@@ -26,6 +26,10 @@
       "types": "./dist/types/report.d.ts",
       "default": "./dist/types/report.js"
     },
+    "./types/reportComparison": {
+      "types": "./dist/types/reportComparison.d.ts",
+      "default": "./dist/types/reportComparison.js"
+    },
     "./types/rbac": {
       "types": "./dist/types/rbac.d.ts",
       "default": "./dist/types/rbac.js"

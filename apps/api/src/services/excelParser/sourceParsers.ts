@@ -5,6 +5,11 @@ import type {
   RenderwaysParsedRecord,
 } from "../../types/sourceRecords.js";
 import {
+  dedupeRowsByTicket,
+  findDuplicateTicketKeys,
+  type TicketDedupeRow,
+} from "../normalization/dedupeRowsByTicket.js";
+import {
   cleanString,
   normalizeCaseId,
   normalizePincode,
@@ -15,19 +20,41 @@ import { readExcelSheet } from "./excelWorkbookReader.js";
 import { findDuplicates } from "./duplicateDetector.js";
 import { getCell } from "./rowAccess.js";
 
-function buildParsedSourceFile<TRecord extends { normalizedTicketId?: string | null; normalizedCaseId?: string | null }>(
+function buildParsedSourceFile<TRecord extends {
+  normalizedTicketId?: string | null;
+  normalizedCaseId?: string | null;
+  rowNumber: number;
+} & TicketDedupeRow>(
   records: TRecord[],
   issues: ParsedSourceFile<TRecord>["issues"],
 ): ParsedSourceFile<TRecord> {
+  const duplicateNormalizedTicketIds = findDuplicates(
+    records.map((record) => record.normalizedTicketId ?? null),
+  );
+  const { dedupedRows, duplicateCount } = dedupeRowsByTicket(records);
+  const residualDuplicateTicketIds = findDuplicateTicketKeys(dedupedRows);
+
+  if (residualDuplicateTicketIds.length > 0) {
+    throw new Error(
+      `Duplicate ticket IDs remain after parse dedupe: ${residualDuplicateTicketIds.join(", ")}`,
+    );
+  }
+
+  if (duplicateCount > 0) {
+    console.info("[sourceParsers] Removed duplicate parsed rows", {
+      duplicateCount,
+      duplicateNormalizedTicketIds,
+    });
+  }
+
   return {
-    records,
+    records: dedupedRows,
     issues,
-    duplicateNormalizedTicketIds: findDuplicates(
-      records.map((record) => record.normalizedTicketId ?? null),
-    ),
+    duplicateNormalizedTicketIds,
     duplicateNormalizedCaseIds: findDuplicates(
-      records.map((record) => record.normalizedCaseId ?? null),
+      dedupedRows.map((record) => record.normalizedCaseId ?? null),
     ),
+    duplicateCount,
   };
 }
 

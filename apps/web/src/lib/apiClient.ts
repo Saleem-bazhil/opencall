@@ -46,6 +46,7 @@ export interface UploadResponse {
     issueCount: number;
     duplicateNormalizedTicketIds: string[];
     duplicateNormalizedCaseIds: string[];
+    duplicateCount: number;
   }>;
 }
 
@@ -56,20 +57,64 @@ export interface MatchPreviewResponse {
   callPlanMatchedRows: number;
   unmatchedFlexRows: number;
   unmatchedCallPlanRows: number;
+  duplicateTracking: {
+    flexWip: number;
+    renderways: number;
+    callPlan: number;
+    total: number;
+  };
   matchStatusCounts: Record<string, number>;
   enrichedRows: Array<Record<string, string | number | null>>;
 }
 
 export interface GeneratedReportResponse {
   reportId: string;
+  sessionId: string;
   reportDate: string;
   columns: readonly string[];
   totalRows: number;
   duplicateTicketCount: number;
   unmatchedTicketCount: number;
+  duplicateTracking: {
+    flexWip: number;
+    renderways: number;
+    callPlan: number;
+    total: number;
+  };
+  comparison: {
+    skipped: boolean;
+    reason: "NO_PREVIOUS_REPORT" | null;
+    currentSessionId: string;
+    previousSessionId: string | null;
+    summary: {
+      total_tickets: number;
+      new_count: number;
+      closed_count: number;
+      updated_count: number;
+      carried_count: number;
+    } | null;
+    duplicateTicketIds: {
+      current: string[];
+      previous: string[];
+    };
+  };
   rows: Array<{
     serialNo: number;
     output: Record<string, string | number>;
+    comparison: {
+      changeType: "NEW" | "CLOSED" | "CARRIED" | "UPDATED" | null;
+      previousFlexStatus: string | null;
+      previousRtplStatus: string | null;
+      previousWipAging: string | null;
+      changedFields: Record<
+        string,
+        {
+          from: string | null;
+          to: string | null;
+        }
+      >;
+      changeSummary: string | null;
+    } | null;
   }>;
 }
 
