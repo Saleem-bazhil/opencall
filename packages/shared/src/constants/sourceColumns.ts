@@ -20,6 +20,7 @@ export const SOURCE_COLUMN_REQUIREMENTS: Record<
     { canonical: "Customer Email", aliases: ["Customer Email", "Customer Mail", "Email", "Customer Email Id"] },
     { canonical: "Part Description", aliases: ["Part Description", "Part"] },
     { canonical: "Customer Pincode", aliases: ["Customer Pincode", "Pincode", "Pin Code"] },
+    { canonical: "Product Line Name", aliases: ["Product Line Name", "ProductLineName", "Product Line"] },
   ],
   RENDERWAYS: [
     { canonical: "Case ID", aliases: ["Case ID", "CaseId", "Case No"] },

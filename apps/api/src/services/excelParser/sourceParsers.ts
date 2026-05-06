@@ -94,6 +94,7 @@ export function parseFlexWipReport(
       customerEmail: cleanString(getCell(row.values, ["Customer Email", "Customer Mail", "Email"])),
       partDescription: cleanString(getCell(row.values, ["Part Description", "Part"])),
       customerPincode: normalizePincode(getCell(row.values, ["Customer Pincode", "Pincode", "Pin Code"])),
+      productLineName: cleanString(getCell(row.values, ["Product Line Name", "ProductLineName", "Product Line"])),
       rawRow: row.rawRow,
       rowNumber: row.rowNumber,
     });

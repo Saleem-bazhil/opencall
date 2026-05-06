@@ -27,6 +27,7 @@ export interface FlexWipParsedRecord {
   customerEmail: string | null;
   partDescription: string | null;
   customerPincode: string | null;
+  productLineName: string | null;
   rawRow: Record<string, unknown>;
   rowNumber: number;
 }

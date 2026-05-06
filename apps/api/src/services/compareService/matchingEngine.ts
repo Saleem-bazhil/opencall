@@ -244,6 +244,7 @@ function buildEnrichedRow(
     segment: getSegment(renderways?.productType, renderways?.callClassification),
     engineer: callPlan?.engineer ?? null,
     product: flexWip?.product ?? null,
+    product_line_name: flexWip?.productLineName ?? null,
     flex_status: flexWip?.flexStatus ?? null,
     hp_owner_status: renderways?.hpOwner ?? null,
     wo_otc_code: flexWip?.woOtcCode ?? null,

@@ -41,6 +41,7 @@ export interface EnrichedCallPlanRow {
   segment: "PC" | "Print" | "Install" | "";
   engineer: string | null;
   product: string | null;
+  product_line_name: string | null;
   flex_status: string | null;
   hp_owner_status: string | null;
   wo_otc_code: string | null;
