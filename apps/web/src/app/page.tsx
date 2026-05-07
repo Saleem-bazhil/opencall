@@ -66,6 +66,7 @@ const FILE_FIELDS: Array<{
 ];
 
 const MANUAL_ENTRY_REQUIRED = "Manual Entry Required";
+const CISS_PRODUCT_LINE = "CISS";
 
 const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
   NEW: "New",
@@ -83,6 +84,13 @@ const CHANGE_FIELD_LABELS: Record<string, string> = {
   engineer: "Engineer",
   location: "Location",
 };
+
+function isCissCase(row: GeneratedReportResponse["rows"][number]): boolean {
+  return String(row.output["Product Line Name"] ?? "")
+    .trim()
+    .toUpperCase()
+    .includes(CISS_PRODUCT_LINE);
+}
 
 const MANUAL_FIELD_BY_COLUMN: Partial<Record<string, ManualCarryForwardField>> = {
   "RTPL status": "rtpl_status",
@@ -402,22 +410,34 @@ export default function DashboardPage() {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [selectedWoOtcCode, setSelectedWoOtcCode] = useState<string | null>(null);
   const [selectedRtplRegion, setSelectedRtplRegion] = useState<string>(ALL_REGIONS_FILTER);
+  const [showCissOnly, setShowCissOnly] = useState(false);
 
   useEffect(() => {
     setSelectedRegion(null);
     setSelectedWoOtcCode(null);
     setSelectedRtplRegion(ALL_REGIONS_FILTER);
+    setShowCissOnly(false);
   }, [report?.reportId]);
+
+  const cissRows = useMemo(() => {
+    if (!report) return [];
+    return report.rows.filter(isCissCase);
+  }, [report]);
+
+  const tableBaseRows = useMemo(() => {
+    if (!report) return [];
+    return showCissOnly ? cissRows : report.rows;
+  }, [cissRows, report, showCissOnly]);
 
   const regionFilteredRows = useMemo(() => {
     if (!report) return [];
     
-    return report.rows.filter((row) => {
+    return tableBaseRows.filter((row) => {
       const matchRegion = selectedRegion === "ALL" || !selectedRegion || row.output["Work Location"] === selectedRegion;
       const matchCode = !selectedWoOtcCode || row.output["WO OTC CODE"] === selectedWoOtcCode;
       return matchRegion && matchCode;
     });
-  }, [report, selectedRegion, selectedWoOtcCode]);
+  }, [report, selectedRegion, selectedWoOtcCode, tableBaseRows]);
 
   // Column-filter hook: operates on rows already filtered by region/WO OTC
   const colFilters = useColumnFilters(regionFilteredRows);
@@ -911,9 +931,10 @@ export default function DashboardPage() {
     const isRtplRegionFiltered = selectedRtplRegion !== ALL_REGIONS_FILTER;
     const hasExistingExportFilter = Boolean(selectedRegion || selectedWoOtcCode);
     const hasColumnFilter = colFilters.activeFilterCount > 0;
+    const hasCissFilter = showCissOnly;
     const exportRows = isRtplRegionFiltered
       ? rtplAnalyticsRows
-      : (hasExistingExportFilter || hasColumnFilter)
+      : (hasExistingExportFilter || hasColumnFilter || hasCissFilter)
         ? filteredRows
         : null;
 
@@ -1171,7 +1192,13 @@ export default function DashboardPage() {
                   <p>{report.reportId}</p>
                 </div>
                 <div className="reportStats">
-                  <Metric label="Rows" value={report.totalRows} />
+                  <Metric label="Total Calls" value={report.totalRows} />
+                  <Metric
+                    label="CISS Cases"
+                    value={cissRows.length}
+                    onClick={() => setShowCissOnly((current) => !current)}
+                    isActive={showCissOnly}
+                  />
                   <Metric label="Duplicates" value={report.duplicateTicketCount} />
                   <Metric label="Manual Required" value={incompleteCellCount} />
                 </div>
@@ -1357,6 +1384,16 @@ export default function DashboardPage() {
                     {filteredRows.length} of {regionFilteredRows.length} rows shown
                   </span>
                   <button type="button" onClick={colFilters.resetAll}>Clear All Filters</button>
+                </div>
+              )}
+              {showCissOnly && (
+                <div className="colFilterSummary">
+                  <span>
+                    CISS Cases active
+                    {" · "}
+                    {filteredRows.length} of {regionFilteredRows.length} rows shown
+                  </span>
+                  <button type="button" onClick={() => setShowCissOnly(false)}>Show All Cases</button>
                 </div>
               )}
               <div className="tableWrap">
