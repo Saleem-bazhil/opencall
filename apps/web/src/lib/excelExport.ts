@@ -24,6 +24,8 @@ export const EXPORT_METADATA_COLUMNS = [
   "Closed Synthetic Row",
 ] as const;
 
+export const STANDARD_EXPORT_COLUMNS = [...DAILY_CALL_PLAN_COLUMNS] as const;
+
 type ExportCellValue = string | number | boolean;
 
 function formatFieldList(fields: readonly string[]): string {
@@ -70,24 +72,20 @@ function manualEntryRequiredColumns(
   return columns.join("; ");
 }
 
+export function mapRowToStandardExport(
+  row: GeneratedReportResponse["rows"][number],
+): ExportCellValue[] {
+  return STANDARD_EXPORT_COLUMNS.map((col) => row.output[col] ?? "");
+}
+
 export function buildReportExportMatrix(
   report: GeneratedReportResponse,
 ): ExportCellValue[][] {
-  const headers = [...EXPORT_METADATA_COLUMNS, ...DAILY_CALL_PLAN_COLUMNS];
+  const headers = [...STANDARD_EXPORT_COLUMNS];
   const data: ExportCellValue[][] = [headers];
 
   for (const row of report.rows) {
-    data.push([
-      exportChangeType(row),
-      row.comparison?.changeSummary ?? "",
-      exportCarryForwardStatus(row),
-      formatFieldList(row.carryForward.carriedForwardFields),
-      row.carryForward.manualFieldsCompleted ? "Yes" : "No",
-      formatFieldList(row.carryForward.manualFieldsMissing),
-      manualEntryRequiredColumns(row),
-      row.carryForward.closedSyntheticRow ? "Yes" : "No",
-      ...DAILY_CALL_PLAN_COLUMNS.map((col) => row.output[col] ?? ""),
-    ]);
+    data.push(mapRowToStandardExport(row));
   }
 
   return data;

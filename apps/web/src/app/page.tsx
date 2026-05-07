@@ -26,6 +26,13 @@ import {
 } from "../lib/apiClient";
 import { ReportHistoryPanel } from "../components/ReportHistoryPanel";
 import { downloadReportAsXlsx, downloadReportAsExcel } from "../lib/excelExport";
+import {
+  ALL_REGIONS_FILTER,
+  buildOverallWoOtcBreakdown,
+  buildRtplOperationalAnalytics,
+  filterRowsByRegion,
+  reportWithRows,
+} from "../lib/reportDashboardAnalytics";
 
 type SourceKey = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
 type FileField = "flexWipReport" | "renderwaysReport" | "callPlan";
@@ -391,10 +398,12 @@ export default function DashboardPage() {
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [selectedWoOtcCode, setSelectedWoOtcCode] = useState<string | null>(null);
+  const [selectedRtplRegion, setSelectedRtplRegion] = useState<string>(ALL_REGIONS_FILTER);
 
   useEffect(() => {
     setSelectedRegion(null);
     setSelectedWoOtcCode(null);
+    setSelectedRtplRegion(ALL_REGIONS_FILTER);
   }, [report?.reportId]);
 
   const filteredRows = useMemo(() => {
@@ -409,18 +418,31 @@ export default function DashboardPage() {
 
   const overallWoOtcBreakdown = useMemo(() => {
     if (!report) return [];
-    const counts = new Map<string, number>();
-    for (const entry of report.regionBreakdown) {
-      if (entry.woOtcCodeBreakdown) {
-        for (const wo of entry.woOtcCodeBreakdown) {
-          counts.set(wo.code, (counts.get(wo.code) || 0) + wo.count);
-        }
-      }
-    }
-    return Array.from(counts.entries())
-      .map(([code, count]) => ({ code, count }))
-      .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+    return buildOverallWoOtcBreakdown(report.regionBreakdown);
   }, [report]);
+
+  const rtplRegionOptions = useMemo(() => {
+    if (!report) return [];
+
+    return [
+      { value: ALL_REGIONS_FILTER, label: "All", count: report.rows.length },
+      ...report.regionBreakdown.map((entry) => ({
+        value: entry.aspCode,
+        label: entry.regionName,
+        count: entry.count,
+      })),
+    ];
+  }, [report]);
+
+  const rtplAnalyticsRows = useMemo(() => {
+    if (!report) return [];
+    return filterRowsByRegion(report.rows, selectedRtplRegion);
+  }, [report, selectedRtplRegion]);
+
+  const rtplStatusMetrics = useMemo(
+    () => buildRtplOperationalAnalytics(rtplAnalyticsRows),
+    [rtplAnalyticsRows],
+  );
 
   const selectedRecords = useMemo(() => {
     if (!preview || !selectedPreviewCategory) return null;
@@ -867,7 +889,15 @@ export default function DashboardPage() {
       return;
     }
 
-    download(report);
+    const isRtplRegionFiltered = selectedRtplRegion !== ALL_REGIONS_FILTER;
+    const hasExistingExportFilter = Boolean(selectedRegion || selectedWoOtcCode);
+    const exportRows = isRtplRegionFiltered
+      ? rtplAnalyticsRows
+      : hasExistingExportFilter
+        ? filteredRows
+        : null;
+
+    download(exportRows ? reportWithRows(report, exportRows) : report);
   }
 
   return (
@@ -1241,6 +1271,47 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
+
+              <div className="rtplAnalyticsSection">
+                <div className="sectionHeader rtplAnalyticsHeader">
+                  <div>
+                    <h3>RTPL Operational Analytics</h3>
+                  </div>
+                  <span className="statusBadge neutral">
+                    {rtplAnalyticsRows.length} rows
+                  </span>
+                </div>
+
+                <div className="regionFilterTabs" aria-label="RTPL analytics region filter">
+                  {rtplRegionOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`regionFilterTab ${selectedRtplRegion === option.value ? "active" : ""}`}
+                      onClick={() => setSelectedRtplRegion(option.value)}
+                    >
+                      <span>{option.label}</span>
+                      <strong>{option.count}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                {rtplStatusMetrics.length > 0 ? (
+                  <div className="rtplMetricGrid">
+                    {rtplStatusMetrics.map((metric) => (
+                      <div className="rtplMetricCard" key={metric.status}>
+                        <span>{metric.status}</span>
+                        <strong>{metric.count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rtplEmptyState">
+                    No RTPL statuses for the selected region.
+                  </div>
+                )}
+              </div>
+
               <div className="downloadActions">
                 <button
                   className="downloadBtn excelBtn"

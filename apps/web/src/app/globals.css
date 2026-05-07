@@ -1072,3 +1072,113 @@ td.missingCell.carriedForwardCell {
   color: var(--accent);
   background: white;
 }
+
+.rtplAnalyticsSection {
+  margin-top: 16px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.rtplAnalyticsHeader {
+  margin-bottom: 12px;
+}
+
+.rtplAnalyticsHeader h3 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.regionFilterTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.regionFilterTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.regionFilterTab strong {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.regionFilterTab:hover {
+  border-color: var(--accent);
+  background: #f8fafc;
+}
+
+.regionFilterTab.active {
+  border-color: var(--accent);
+  background: #e7f5f5;
+  color: var(--accent);
+}
+
+.regionFilterTab.active strong {
+  background: white;
+  color: var(--accent);
+}
+
+.rtplMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.rtplMetricCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.rtplMetricCard span {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rtplMetricCard strong {
+  color: var(--accent);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.rtplEmptyState {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}

@@ -4,6 +4,7 @@ import type { GeneratedReportResponse } from "./apiClient";
 import {
   buildReportExportMatrix,
   EXPORT_METADATA_COLUMNS,
+  STANDARD_EXPORT_COLUMNS,
 } from "./excelExport";
 
 function outputRow(
@@ -121,34 +122,21 @@ function reportFixture(): GeneratedReportResponse {
 }
 
 describe("buildReportExportMatrix", () => {
-  it("adds carry-forward and manual-entry metadata to exported rows", () => {
+  it("exports only standard ERP business columns in report order", () => {
     const matrix = buildReportExportMatrix(reportFixture());
     const header = matrix[0];
     const carriedRow = matrix[1];
     const closedRow = matrix[2];
 
-    expect(header?.slice(0, EXPORT_METADATA_COLUMNS.length)).toEqual([
-      ...EXPORT_METADATA_COLUMNS,
-    ]);
-    expect(carriedRow?.slice(0, EXPORT_METADATA_COLUMNS.length)).toEqual([
-      "NEW",
-      "New ticket",
-      "CARRIED",
-      "Engineer",
-      "No",
-      "Customer Mail",
-      "Customer Mail",
-      "No",
-    ]);
-    expect(closedRow?.slice(0, EXPORT_METADATA_COLUMNS.length)).toEqual([
-      "CLOSED",
-      "Ticket closed",
-      "CLOSED",
-      "",
-      "Yes",
-      "",
-      "",
-      "Yes",
-    ]);
+    expect(header).toEqual([...STANDARD_EXPORT_COLUMNS]);
+    expect(header).not.toEqual(expect.arrayContaining([...EXPORT_METADATA_COLUMNS]));
+    expect(carriedRow).toHaveLength(STANDARD_EXPORT_COLUMNS.length);
+    expect(closedRow).toHaveLength(STANDARD_EXPORT_COLUMNS.length);
+    expect(carriedRow?.[0]).toBe(1);
+    expect(carriedRow?.[1]).toBe("WO-123");
+    expect(carriedRow?.[7]).toBe("Priya");
+    expect(carriedRow?.[21]).toBe("Manual Entry Required");
+    expect(closedRow?.[1]).toBe("WO-999");
+    expect(closedRow?.[7]).toBe("Alex");
   });
 });
