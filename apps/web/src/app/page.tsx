@@ -2,6 +2,9 @@
 
 import { DAILY_CALL_PLAN_COLUMNS, RTPL_STATUS_OPTIONS } from "@opencall/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ColumnFilterDropdown } from "../components/ColumnFilterDropdown";
+import { useColumnFilters } from "../lib/useColumnFilters";
+import { FILTERABLE_COLUMNS } from "../lib/columnFilter";
 import {
   generateReport,
   getDatabaseHealth,
@@ -406,7 +409,7 @@ export default function DashboardPage() {
     setSelectedRtplRegion(ALL_REGIONS_FILTER);
   }, [report?.reportId]);
 
-  const filteredRows = useMemo(() => {
+  const regionFilteredRows = useMemo(() => {
     if (!report) return [];
     
     return report.rows.filter((row) => {
@@ -415,6 +418,22 @@ export default function DashboardPage() {
       return matchRegion && matchCode;
     });
   }, [report, selectedRegion, selectedWoOtcCode]);
+
+  // Column-filter hook: operates on rows already filtered by region/WO OTC
+  const colFilters = useColumnFilters(regionFilteredRows);
+
+  // Reset column filters when the report changes
+  const reportId = report?.reportId;
+  useEffect(() => {
+    colFilters.resetAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportId]);
+
+  // Final visible rows: region-filtered → column-filtered
+  const filteredRows = useMemo(
+    () => colFilters.filteredRows(regionFilteredRows),
+    [colFilters, regionFilteredRows],
+  );
 
   const overallWoOtcBreakdown = useMemo(() => {
     if (!report) return [];
@@ -891,9 +910,10 @@ export default function DashboardPage() {
 
     const isRtplRegionFiltered = selectedRtplRegion !== ALL_REGIONS_FILTER;
     const hasExistingExportFilter = Boolean(selectedRegion || selectedWoOtcCode);
+    const hasColumnFilter = colFilters.activeFilterCount > 0;
     const exportRows = isRtplRegionFiltered
       ? rtplAnalyticsRows
-      : hasExistingExportFilter
+      : (hasExistingExportFilter || hasColumnFilter)
         ? filteredRows
         : null;
 
@@ -1194,7 +1214,7 @@ export default function DashboardPage() {
                     style={{ cursor: "pointer", border: "2px solid var(--accent)", background: "rgba(18, 143, 143, 0.05)" }}
                   >
                     <div className="regionMetricHeader">
-                      <div className="regionMetricValue">{report.rows.length}</div>
+                        <div className="regionMetricValue">{report.rows.length}</div>
                       <div className="regionMetricLabel">ALL REGIONS</div>
                       <div className="regionMetricSubtext">GLOBAL</div>
                     </div>
@@ -1326,15 +1346,51 @@ export default function DashboardPage() {
                   Download CSV
                 </button>
               </div>
+              {colFilters.activeFilterCount > 0 && (
+                <div className="colFilterSummary">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 2h14l-5.5 6.5V14l-3-1.5V8.5L1 2z" fill="currentColor" />
+                  </svg>
+                  <span>
+                    {colFilters.activeFilterCount} column filter{colFilters.activeFilterCount > 1 ? "s" : ""} active
+                    {" · "}
+                    {filteredRows.length} of {regionFilteredRows.length} rows shown
+                  </span>
+                  <button type="button" onClick={colFilters.resetAll}>Clear All Filters</button>
+                </div>
+              )}
               <div className="tableWrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Change</th>
                       <th>Ops</th>
-                      {DAILY_CALL_PLAN_COLUMNS.map((column) => (
-                        <th key={column}>{column}</th>
-                      ))}
+                      {DAILY_CALL_PLAN_COLUMNS.map((column) => {
+                        const isFilterable = colFilters.isFilterable(column);
+                        const isFiltered = colFilters.isColumnFiltered(column);
+                        const uniqueVals = colFilters.uniqueValuesMap.get(column) ?? [];
+
+                        return (
+                          <th key={column}>
+                            {column}
+                            {isFilterable && (
+                              <ColumnFilterDropdown
+                                column={column}
+                                isOpen={colFilters.openColumn === column}
+                                uniqueValues={uniqueVals}
+                                selectedValues={colFilters.filters[column]}
+                                isFiltered={isFiltered}
+                                onToggleValue={colFilters.toggleValue}
+                                onSelectAll={colFilters.selectAll}
+                                onClearAll={colFilters.clearAll}
+                                onApply={colFilters.setColumnFilter}
+                                onOpen={colFilters.openFilterDropdown}
+                                onClose={colFilters.closeFilterDropdown}
+                              />
+                            )}
+                          </th>
+                        );
+                      })}
                       <th className="stickyActionColumn">Action</th>
                     </tr>
                   </thead>
