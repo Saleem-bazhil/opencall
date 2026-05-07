@@ -431,6 +431,19 @@ td {
   overflow: visible;
 }
 
+.stickyActionColumn {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: white;
+  border-left: 1px solid var(--border);
+}
+
+th.stickyActionColumn {
+  z-index: 3;
+  background: var(--surface-subtle);
+}
+
 .changeTooltipWrap {
   position: relative;
   display: inline-flex;

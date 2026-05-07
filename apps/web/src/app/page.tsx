@@ -985,7 +985,7 @@ export default function DashboardPage() {
                       {DAILY_CALL_PLAN_COLUMNS.map((column) => (
                         <th key={column}>{column}</th>
                       ))}
-                      <th>Action</th>
+                      <th className="stickyActionColumn">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1097,7 +1097,7 @@ export default function DashboardPage() {
                               </td>
                             );
                           })}
-                          <td>
+                          <td className="stickyActionColumn">
                             {isEditing ? (
                               <div className="rowActions">
                                 <button type="button" onClick={() => saveEditing(row.serialNo)}>
