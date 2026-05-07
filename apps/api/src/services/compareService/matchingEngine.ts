@@ -258,6 +258,8 @@ function buildEnrichedRow(
     tat: calculateTAT(renderways?.partnerAccept, slaHours),
     customer_mail: flexWip?.customerEmail ?? null,
     rca: renderways?.rcaMessage ?? null,
+    remarks: null,
+    manual_notes: null,
     match_status: matchStatus,
   };
 }

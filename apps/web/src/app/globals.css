@@ -343,6 +343,31 @@ code {
   padding: 14px;
 }
 
+.carryForwardPanel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #b7d8ce;
+  border-radius: 8px;
+  background: #f4fbf8;
+  padding: 14px;
+}
+
+.carryForwardPanel h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.carryForwardPanel p {
+  margin: 4px 0 0;
+  max-width: 680px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .comparisonPanel.skipped {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -431,6 +456,10 @@ td {
   overflow: visible;
 }
 
+.opsCell {
+  min-width: 124px;
+}
+
 .stickyActionColumn {
   position: sticky;
   right: 0;
@@ -487,6 +516,54 @@ th.stickyActionColumn {
 .changeBadge.none {
   background: var(--surface-subtle);
   color: var(--muted);
+}
+
+.opsBadge,
+.manualCount,
+.cellCarryFlag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.opsBadge {
+  min-width: 72px;
+  min-height: 26px;
+  padding: 4px 9px;
+}
+
+.opsBadge.carried,
+.opsBadge.complete {
+  background: #e7f6ef;
+  color: var(--success);
+}
+
+.opsBadge.new {
+  background: #e8f7ff;
+  color: #05668d;
+}
+
+.opsBadge.closed {
+  background: #fff2f1;
+  color: var(--danger);
+}
+
+.opsBadge.manual {
+  background: #fff3dd;
+  color: var(--warning);
+}
+
+.manualCount {
+  min-width: 22px;
+  min-height: 22px;
+  margin-left: 6px;
+  background: var(--danger);
+  color: #ffffff;
 }
 
 .changeTooltip {
@@ -550,6 +627,37 @@ td.missingCell {
   background: #fff3dd;
   color: #7b4300;
   font-weight: 800;
+}
+
+td.carriedForwardCell {
+  background: #f2fbf7;
+  color: #154d35;
+  font-weight: 800;
+}
+
+td.missingCell.carriedForwardCell {
+  background: #fff8e8;
+}
+
+.cellValueWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.cellValueWrap > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cellCarryFlag {
+  min-height: 18px;
+  padding: 3px 6px;
+  background: #dff3ea;
+  color: var(--success);
+  font-size: 10px;
 }
 
 .cellInput {
@@ -649,7 +757,8 @@ td.missingCell {
     flex-direction: column;
   }
 
-  .comparisonPanel p {
+  .comparisonPanel p,
+  .carryForwardPanel p {
     white-space: normal;
   }
 }

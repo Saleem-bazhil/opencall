@@ -38,7 +38,7 @@ export interface EnrichedCallPlanRow {
   case_created_time: string | null;
   wip_aging: string | null;
   rtpl_status: string;
-  segment: "PC" | "Print" | "Install" | "";
+  segment: string;
   engineer: string | null;
   product: string | null;
   product_line_name: string | null;
@@ -55,6 +55,8 @@ export interface EnrichedCallPlanRow {
   tat: string | null;
   customer_mail: string | null;
   rca: string | null;
+  remarks: string | null;
+  manual_notes: string | null;
   match_status: MatchStatus;
 }
 

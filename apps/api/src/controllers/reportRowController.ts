@@ -1,0 +1,34 @@
+import type { RequestHandler } from "express";
+import {
+  requireCurrentUser,
+} from "../services/rbac/regionAccessService.js";
+import { updateReportRowManualFields } from "../services/reportRows/reportRowEditService.js";
+import type { ReportRowEditInput } from "../services/reportRows/reportRowEditService.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { badRequest } from "../utils/httpError.js";
+import { reportRowEditRequestSchema } from "../validators/reportRowEditRequestValidator.js";
+
+export const updateReportRowController: RequestHandler = asyncHandler(
+  async (request, response) => {
+    const currentUser = requireCurrentUser(request.currentUser);
+    const rowId = request.params.id?.trim();
+
+    if (!rowId) {
+      throw badRequest("Missing report row id");
+    }
+
+    const parsedValues = reportRowEditRequestSchema.parse(request.body);
+    const values = Object.fromEntries(
+      Object.entries(parsedValues).filter(([, value]) => value !== undefined),
+    ) as ReportRowEditInput;
+    const row = await updateReportRowManualFields({
+      rowId,
+      user: currentUser,
+      values,
+    });
+
+    response.json({
+      data: row,
+    });
+  },
+);

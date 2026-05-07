@@ -6,6 +6,8 @@ import {
 } from "../../repositories/businessRuleRepository.js";
 import {
   createDailyCallPlanReport,
+  findDailyCallPlanReportRowMetadataByReportId,
+  findPreviousFinalReportRowsForManualCarryForward,
   insertDailyCallPlanReportRows,
 } from "../../repositories/dailyCallPlanReportRepository.js";
 import { findOrCreateCompletedHistorySessionForReport } from "../../repositories/historyRepository.js";
@@ -29,21 +31,24 @@ import type {
   GeneratedDailyCallPlanReport,
   GeneratedDailyCallPlanRow,
   GenerateDailyCallPlanInput,
+  ManualCarryForwardRowMetadata,
 } from "../../types/reportGeneration.js";
+import { MANUAL_CARRY_FORWARD_FIELDS } from "../../types/reportGeneration.js";
 import { unprocessableEntity } from "../../utils/httpError.js";
 import { matchSourceRecords } from "../compareService/matchingEngine.js";
 import {
   dedupeRowsByTicket,
   findDuplicateTicketKeys,
+  getNormalizedTicketKey,
 } from "../normalization/dedupeRowsByTicket.js";
 import {
   buildReportComparison,
-  comparePersistedReportSessions,
 } from "../reportComparison/compareReportsService.js";
 import {
   formatDailyCallPlanRow,
   orderedDailyCallPlanRow,
 } from "./dailyCallPlanFormatter.js";
+import { manualFieldCarryForwardService } from "./manualFieldCarryForwardService.js";
 import { validateReportGenerationTransaction } from "./reportGenerationValidation.js";
 
 function countDuplicateTickets(rows: readonly GeneratedDailyCallPlanRow[]): number {
@@ -72,8 +77,20 @@ function countUnmatchedRows(
   ]);
 
   return rows.filter((row) =>
+    !row.carryForward.closedSyntheticRow &&
     unmatchedStatuses.has(row.enriched.match_status),
   ).length;
+}
+
+function initialCarryForwardMetadata(): ManualCarryForwardRowMetadata {
+  return {
+    carriedForwardFields: [],
+    manualFieldsCompleted: false,
+    manualFieldsMissing: [...MANUAL_CARRY_FORWARD_FIELDS],
+    changeType: null,
+    previousTicketMatched: false,
+    closedSyntheticRow: false,
+  };
 }
 
 const ASP_CODE_REGION_MAP: Record<string, string> = {
@@ -177,7 +194,40 @@ function applyComparisonToGeneratedRows(
   );
 
   for (const row of rows) {
-    row.comparison = insightByRowNumber.get(row.serialNo) ?? null;
+    row.comparison = insightByRowNumber.get(row.serialNo) ?? row.comparison;
+  }
+}
+
+function activeRowsForComparison(
+  rows: readonly GeneratedDailyCallPlanRow[],
+): GeneratedDailyCallPlanRow[] {
+  return rows.filter((row) => !row.carryForward.closedSyntheticRow);
+}
+
+async function applyPersistedRowMetadata(
+  client: Parameters<typeof findDailyCallPlanReportRowMetadataByReportId>[0],
+  reportId: string,
+  rows: GeneratedDailyCallPlanRow[],
+): Promise<void> {
+  const metadata = await findDailyCallPlanReportRowMetadataByReportId(
+    client,
+    reportId,
+  );
+  const metadataByTicket = new Map(
+    metadata.map((row) => [getNormalizedTicketKey(row.ticketId), row]),
+  );
+
+  for (const row of rows) {
+    const ticketKey = getNormalizedTicketKey(row.enriched.ticket_id);
+    const persisted = metadataByTicket.get(ticketKey);
+
+    if (!persisted) {
+      continue;
+    }
+
+    row.id = persisted.id;
+    row.updatedAt = persisted.updatedAt;
+    row.updatedBy = persisted.updatedBy;
   }
 }
 
@@ -280,19 +330,35 @@ export async function generateDailyCallPlanReport(
       return valB - valA;
     });
 
-    const rows = matchedMatches.map<GeneratedDailyCallPlanRow>((match, index) => {
+    const generatedRows = matchedMatches.map<GeneratedDailyCallPlanRow>((match, index) => {
       const serialNo = index + 1;
 
       return {
+        id: null,
         serialNo,
         enriched: match.enrichedRow,
         match,
         comparison: null,
+        carryForward: initialCarryForwardMetadata(),
+        updatedAt: null,
+        updatedBy: null,
+        rowEditable: true,
+        carryForwardSource: "PREVIOUS_FINAL_REPORT",
         output: orderedDailyCallPlanRow(
           formatDailyCallPlanRow(serialNo, match.enrichedRow),
         ),
       };
     });
+    const previousFinalRows =
+      await findPreviousFinalReportRowsForManualCarryForward(client, {
+        reportDate: input.reportDate,
+        regionId: input.regionId,
+      });
+    const carryForwardResult = manualFieldCarryForwardService.apply({
+      currentRows: generatedRows,
+      previousFinalRows,
+    });
+    const rows = carryForwardResult.rows;
     const duplicateTicketCount = countDuplicateTickets(rows);
     const unmatchedTicketCount = countUnmatchedRows(rows);
     
@@ -320,38 +386,27 @@ export async function generateDailyCallPlanReport(
     );
     let comparison: GeneratedReportComparisonMetadata;
 
-    if (existingReportId) {
-      const persistedComparison = await comparePersistedReportSessions(client, {
+    const previousSession = await findPreviousCompletedComparisonSession(
+      client,
+      historySession.id,
+    );
+
+    if (!previousSession) {
+      comparison = skippedComparisonMetadata(historySession.id);
+    } else {
+      const previousRows = await findComparableReportRowsBySessionId(
+        client,
+        previousSession.id,
+      );
+      const reportComparison = buildReportComparison({
         currentSessionId: historySession.id,
+        previousSessionId: previousSession.id,
+        currentRows: activeRowsForComparison(rows).map(toComparableReportRow),
+        previousRows,
       });
 
-      if (persistedComparison.skipped) {
-        comparison = skippedComparisonMetadata(historySession.id);
-      } else {
-        applyComparisonToGeneratedRows(rows, persistedComparison);
-        comparison = metadataFromComparison(persistedComparison);
-      }
-    } else {
-      const previousSession = await findPreviousCompletedComparisonSession(
-        client,
-        historySession.id,
-      );
-
-      if (!previousSession) {
-        comparison = skippedComparisonMetadata(historySession.id);
-      } else {
-        const previousRows = await findComparableReportRowsBySessionId(
-          client,
-          previousSession.id,
-        );
-        const reportComparison = buildReportComparison({
-          currentSessionId: historySession.id,
-          previousSessionId: previousSession.id,
-          currentRows: rows.map(toComparableReportRow),
-          previousRows,
-        });
-
-        applyComparisonToGeneratedRows(rows, reportComparison);
+      applyComparisonToGeneratedRows(rows, reportComparison);
+      if (!existingReportId) {
         await replaceReportComparison(client, {
           currentSessionId: reportComparison.currentSessionId,
           previousSessionId: reportComparison.previousSessionId,
@@ -362,10 +417,14 @@ export async function generateDailyCallPlanReport(
             changedFields: diff.changedFields,
           })),
         });
-        comparison = metadataFromComparison(reportComparison);
       }
+      comparison = metadataFromComparison(reportComparison);
+    }
 
+    if (!existingReportId) {
       await insertDailyCallPlanReportRows(client, reportId, rows);
+    } else {
+      await applyPersistedRowMetadata(client, reportId, rows);
     }
 
     return {
@@ -377,6 +436,7 @@ export async function generateDailyCallPlanReport(
       duplicateTicketCount,
       unmatchedTicketCount,
       duplicateTracking,
+      carryForward: carryForwardResult.summary,
       comparison,
       regionBreakdown: computeRegionBreakdown(rows),
       rows,

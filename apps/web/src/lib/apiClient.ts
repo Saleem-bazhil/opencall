@@ -81,6 +81,11 @@ export interface GeneratedReportResponse {
     callPlan: number;
     total: number;
   };
+  carryForward: {
+    totalFieldsCarried: number;
+    rowsAutoCompleted: number;
+    rowsStillManual: number;
+  };
   comparison: {
     skipped: boolean;
     reason: "NO_PREVIOUS_REPORT" | null;
@@ -108,6 +113,7 @@ export interface GeneratedReportResponse {
     }>;
   }>;
   rows: Array<{
+    id: string | null;
     serialNo: number;
     output: Record<string, string | number>;
     comparison: {
@@ -124,7 +130,40 @@ export interface GeneratedReportResponse {
       >;
       changeSummary: string | null;
     } | null;
+    carryForward: {
+      carriedForwardFields: string[];
+      manualFieldsCompleted: boolean;
+      manualFieldsMissing: string[];
+      changeType: "NEW" | "CLOSED" | "CARRIED" | "UPDATED" | "NEW_WORK_ORDER" | null;
+      previousTicketMatched: boolean;
+      closedSyntheticRow: boolean;
+    };
+    updatedAt: string | null;
+    updatedBy: string | null;
+    rowEditable: boolean;
+    carryForwardSource: "PREVIOUS_FINAL_REPORT";
   }>;
+}
+
+export interface EditedReportRowResponse {
+  id: string;
+  reportId: string;
+  regionId: string | null;
+  engineer: string | null;
+  rtplStatus: string | null;
+  customerMail: string | null;
+  rca: string | null;
+  remarks: string | null;
+  manualNotes: string | null;
+  location: string | null;
+  segment: string | null;
+  manualFieldsCompleted: boolean;
+  manualFieldsMissing: string[];
+  updatedAt: string;
+  updatedBy: string | null;
+  rowEditable: boolean;
+  carryForwardSource: "PREVIOUS_FINAL_REPORT";
+  carriedForwardFields?: string[];
 }
 
 export interface RuntimeHealthResponse {
@@ -286,6 +325,32 @@ export async function generateReport(input: {
   );
 
   return readJson<GeneratedReportResponse>(response);
+}
+
+export async function updateReportRow(input: {
+  token: string;
+  rowId: string;
+  values: {
+    engineer?: string | null;
+    rtpl_status?: string | null;
+    customer_mail?: string | null;
+    rca?: string | null;
+    remarks?: string | null;
+    manual_notes?: string | null;
+    location?: string | null;
+    segment?: string | null;
+  };
+}): Promise<EditedReportRowResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/report-rows/${input.rowId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${input.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input.values),
+  });
+
+  return readJson<EditedReportRowResponse>(response);
 }
 
 export interface ReportHistorySession {

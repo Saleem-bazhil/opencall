@@ -8,8 +8,10 @@ import {
   getRuntimeHealth,
   login,
   previewMatches,
+  updateReportRow,
   uploadReports,
   type DatabaseHealthResponse,
+  type EditedReportRowResponse,
   type GeneratedReportResponse,
   type LoginResponse,
   type MatchPreviewResponse,
@@ -28,6 +30,13 @@ import { downloadReportAsXlsx, downloadReportAsExcel } from "../lib/excelExport"
 type SourceKey = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
 type FileField = "flexWipReport" | "renderwaysReport" | "callPlan";
 type ChangeType = "NEW" | "CLOSED" | "CARRIED" | "UPDATED";
+type ManualCarryForwardField =
+  | "rtpl_status"
+  | "segment"
+  | "engineer"
+  | "location"
+  | "customer_mail"
+  | "rca";
 
 const SOURCE_LABELS: Record<SourceKey, string> = {
   FLEX_WIP: "Flex WIP",
@@ -63,6 +72,54 @@ const CHANGE_FIELD_LABELS: Record<string, string> = {
   tat: "TAT",
   engineer: "Engineer",
   location: "Location",
+};
+
+const MANUAL_FIELD_BY_COLUMN: Partial<Record<string, ManualCarryForwardField>> = {
+  "RTPL status": "rtpl_status",
+  Segment: "segment",
+  Engineer: "engineer",
+  Location: "location",
+  "Customer Mail": "customer_mail",
+  RCA: "rca",
+};
+
+const MANUAL_FIELD_LABELS: Record<ManualCarryForwardField, string> = {
+  rtpl_status: "RTPL status",
+  segment: "Segment",
+  engineer: "Engineer",
+  location: "Location",
+  customer_mail: "Customer Mail",
+  rca: "RCA",
+};
+
+const EDITABLE_COLUMN_API_FIELD: Partial<Record<string, string>> = {
+  "RTPL status": "rtpl_status",
+  Segment: "segment",
+  Engineer: "engineer",
+  Location: "location",
+  "Customer Mail": "customer_mail",
+  RCA: "rca",
+};
+
+type ReportRowPatchValues = Parameters<typeof updateReportRow>[0]["values"];
+
+const EDITED_RESPONSE_COLUMN: Partial<
+  Record<string, keyof Pick<
+    EditedReportRowResponse,
+    | "rtplStatus"
+    | "segment"
+    | "engineer"
+    | "location"
+    | "customerMail"
+    | "rca"
+  >>
+> = {
+  "RTPL status": "rtplStatus",
+  Segment: "segment",
+  Engineer: "engineer",
+  Location: "location",
+  "Customer Mail": "customerMail",
+  RCA: "rca",
 };
 
 function todayIsoDate(): string {
@@ -122,6 +179,16 @@ function formatComparisonValue(value: string | null): string {
   return value === null || value.trim() === "" ? "blank" : value;
 }
 
+function formatFieldList(fields: readonly string[]): string {
+  if (fields.length === 0) {
+    return "None";
+  }
+
+  return fields
+    .map((field) => MANUAL_FIELD_LABELS[field as ManualCarryForwardField] ?? field)
+    .join(", ");
+}
+
 function ChangeTypeBadge({
   comparison,
 }: Readonly<{
@@ -176,6 +243,91 @@ function ChangeTypeBadge({
   );
 }
 
+function CarryForwardBadge({
+  carryForward,
+}: Readonly<{
+  carryForward: GeneratedReportResponse["rows"][number]["carryForward"];
+}>) {
+  if (carryForward.closedSyntheticRow) {
+    return (
+      <span
+        className="opsBadge closed"
+        title="Closed work order carried from the previous final report"
+      >
+        Closed
+      </span>
+    );
+  }
+
+  if (carryForward.carriedForwardFields.length > 0) {
+    return (
+      <span
+        className="opsBadge carried"
+        title={`Value carried from previous day: ${formatFieldList(carryForward.carriedForwardFields)}`}
+      >
+        Carried
+      </span>
+    );
+  }
+
+  if (carryForward.changeType === "NEW_WORK_ORDER") {
+    return (
+      <span
+        className="opsBadge new"
+        title="New work order; manual fields must be completed today"
+      >
+        New WO
+      </span>
+    );
+  }
+
+  if (carryForward.manualFieldsMissing.length > 0) {
+    return (
+      <span
+        className="opsBadge manual"
+        title={`Manual entry required: ${formatFieldList(carryForward.manualFieldsMissing)}`}
+      >
+        Manual
+      </span>
+    );
+  }
+
+  return (
+    <span className="opsBadge complete" title="Manual fields are complete">
+      Complete
+    </span>
+  );
+}
+
+function CarryForwardSummaryPanel({
+  report,
+}: Readonly<{
+  report: GeneratedReportResponse;
+}>) {
+  return (
+    <div className="carryForwardPanel">
+      <div className="comparisonPanelHeader">
+        <div>
+          <h3>Manual Field Carry-Forward</h3>
+          <p>Uses the previous final human-edited report for this region.</p>
+        </div>
+        <StatusPill tone={report.carryForward.totalFieldsCarried > 0 ? "good" : "neutral"}>
+          {report.carryForward.totalFieldsCarried > 0 ? "Applied" : "No carried fields"}
+        </StatusPill>
+      </div>
+      <div className="comparisonMetricGrid">
+        <Metric label="Fields Carried" value={report.carryForward.totalFieldsCarried} />
+        <Metric label="Rows Auto Completed" value={report.carryForward.rowsAutoCompleted} />
+        <Metric label="Rows Still Manual" value={report.carryForward.rowsStillManual} />
+        <Metric
+          label="Closed Rows"
+          value={report.rows.filter((row) => row.carryForward.closedSyntheticRow).length}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ComparisonSummaryPanel({
   report,
 }: Readonly<{
@@ -223,6 +375,7 @@ export default function DashboardPage() {
   const [preview, setPreview] = useState<MatchPreviewResponse | null>(null);
   const [report, setReport] = useState<GeneratedReportResponse | null>(null);
   const [editingSerialNo, setEditingSerialNo] = useState<number | null>(null);
+  const [savingSerialNo, setSavingSerialNo] = useState<number | null>(null);
    const [draftOutput, setDraftOutput] = useState<Record<string, string | number>>({});
    const draftOutputRef = useRef(draftOutput);
    draftOutputRef.current = draftOutput;
@@ -408,6 +561,7 @@ export default function DashboardPage() {
       setPreview(null);
       setReport(null);
       setEditingSerialNo(null);
+      setSavingSerialNo(null);
       setDraftOutput({});
       
       // Refresh history to get the draft
@@ -449,6 +603,7 @@ export default function DashboardPage() {
         }),
       );
       setEditingSerialNo(null);
+      setSavingSerialNo(null);
       setDraftOutput({});
       
       // Refresh history to see completed status
@@ -464,6 +619,7 @@ export default function DashboardPage() {
     setPreview(null);
     setReport(null);
     setEditingSerialNo(null);
+    setSavingSerialNo(null);
     setDraftOutput({});
     setSelectedPreviewCategory(null);
   }
@@ -491,6 +647,7 @@ export default function DashboardPage() {
       setPreview(null);
       setReport(null);
       setEditingSerialNo(null);
+      setSavingSerialNo(null);
       setDraftOutput({});
       setFiles({});
       if (detail.regionId) setRegionId(detail.regionId);
@@ -543,7 +700,10 @@ export default function DashboardPage() {
   const canUseBatches = Boolean(batchIds.flexUploadBatchId);
   const incompleteCellCount = useMemo(() => {
     return report?.rows.reduce((count, row) => {
-      return count + Object.values(row.output).filter((value) => value === MANUAL_ENTRY_REQUIRED).length;
+      const outputMissingCount = Object.values(row.output).filter(
+        (value) => value === MANUAL_ENTRY_REQUIRED,
+      ).length;
+      return count + Math.max(outputMissingCount, row.carryForward.manualFieldsMissing.length);
     }, 0) ?? 0;
   }, [report]);
 
@@ -557,23 +717,140 @@ export default function DashboardPage() {
     setDraftOutput({});
   }
 
-   function saveEditing(serialNo: number) {
-     setReport((current) => {
-       if (!current) {
-         return current;
-       }
+  function patchValue(column: string): string | null {
+    const value = String(draftOutputRef.current[column] ?? "").trim();
+    return value && value !== MANUAL_ENTRY_REQUIRED ? value : null;
+  }
 
-       return {
-         ...current,
-         rows: current.rows.map((row) =>
-           row.serialNo === serialNo
-             ? { ...row, output: { ...draftOutputRef.current, "S.no": row.serialNo } }
-             : row,
-         ),
-       };
-     });
-     cancelEditing();
-   }
+  function buildReportRowPatchValues(
+    row: GeneratedReportResponse["rows"][number],
+  ): ReportRowPatchValues {
+    const values: ReportRowPatchValues = {};
+
+    for (const [column, apiField] of Object.entries(EDITABLE_COLUMN_API_FIELD)) {
+      if (!apiField) {
+        continue;
+      }
+
+      const draftValue = patchValue(column);
+      const currentValue = String(row.output[column] ?? "").trim();
+      const normalizedCurrent =
+        currentValue && currentValue !== MANUAL_ENTRY_REQUIRED ? currentValue : null;
+
+      if (draftValue === null || draftValue === normalizedCurrent) {
+        continue;
+      }
+
+      values[apiField as keyof ReportRowPatchValues] = draftValue;
+    }
+
+    return values;
+  }
+
+  function outputFromPersistedRow(
+    output: Record<string, string | number>,
+    persisted: EditedReportRowResponse,
+  ): Record<string, string | number> {
+    const nextOutput = { ...output };
+
+    for (const [column, responseField] of Object.entries(EDITED_RESPONSE_COLUMN)) {
+      if (!responseField) {
+        continue;
+      }
+
+      const value = persisted[responseField];
+      nextOutput[column] =
+        typeof value === "string" && value.trim().length > 0
+          ? value
+          : MANUAL_ENTRY_REQUIRED;
+    }
+
+    return nextOutput;
+  }
+
+  async function saveEditing(serialNo: number) {
+    if (!session) {
+      setMessage("Login required");
+      return;
+    }
+
+    const currentReport = report;
+    const row = currentReport?.rows.find((candidate) => candidate.serialNo === serialNo);
+
+    if (!currentReport || !row) {
+      return;
+    }
+
+    if (!row.id) {
+      setMessage("Save failed: this row has not been persisted yet. Regenerate the report and try again.");
+      return;
+    }
+
+    setSavingSerialNo(serialNo);
+    setMessage(null);
+
+    try {
+      const values = buildReportRowPatchValues(row);
+
+      if (Object.keys(values).length === 0) {
+        cancelEditing();
+        return;
+      }
+
+      const persisted = await updateReportRow({
+        token: session.token,
+        rowId: row.id,
+        values,
+      });
+      const editedApiFields = new Set(Object.keys(values));
+
+      setReport((latestReport) => {
+        if (!latestReport) {
+          return latestReport;
+        }
+
+        return {
+          ...latestReport,
+          rows: latestReport.rows.map((latestRow) =>
+            latestRow.serialNo === serialNo
+              ? {
+                  ...latestRow,
+                  output: outputFromPersistedRow(
+                    { ...draftOutputRef.current, "S.no": latestRow.serialNo },
+                    persisted,
+                  ),
+                  carryForward: {
+                    ...latestRow.carryForward,
+                    carriedForwardFields:
+                      persisted.carriedForwardFields ??
+                      latestRow.carryForward.carriedForwardFields.filter((field) => {
+                        const column = Object.entries(MANUAL_FIELD_BY_COLUMN).find(
+                          ([, manualField]) => manualField === field,
+                        )?.[0];
+                        const apiField = column ? EDITABLE_COLUMN_API_FIELD[column] : null;
+                        return apiField ? !editedApiFields.has(apiField) : true;
+                      }),
+                    manualFieldsCompleted: persisted.manualFieldsCompleted,
+                    manualFieldsMissing: persisted.manualFieldsMissing,
+                  },
+                  updatedAt: persisted.updatedAt,
+                  updatedBy: persisted.updatedBy,
+                  rowEditable: persisted.rowEditable,
+                  carryForwardSource: persisted.carryForwardSource,
+                }
+              : latestRow,
+          ),
+        };
+      });
+      cancelEditing();
+      setMessage("Row saved.");
+    } catch (error) {
+      setReport(currentReport);
+      setMessage(error instanceof Error ? `Save failed: ${error.message}` : "Save failed");
+    } finally {
+      setSavingSerialNo(null);
+    }
+  }
 
   function exportReport(download: (report: GeneratedReportResponse) => void) {
     if (!report) {
@@ -854,6 +1131,7 @@ export default function DashboardPage() {
                   Click any highlighted "Manual Entry Required" cell or the row Edit button to enter manual data.
                 </p>
               ) : null}
+              <CarryForwardSummaryPanel report={report} />
               <ComparisonSummaryPanel report={report} />
 
               <div className="regionBreakdownSection">
@@ -982,6 +1260,7 @@ export default function DashboardPage() {
                   <thead>
                     <tr>
                       <th>Change</th>
+                      <th>Ops</th>
                       {DAILY_CALL_PLAN_COLUMNS.map((column) => (
                         <th key={column}>{column}</th>
                       ))}
@@ -996,7 +1275,8 @@ export default function DashboardPage() {
                         <tr
                           key={row.serialNo}
                           className={
-                            Object.values(row.output).includes(MANUAL_ENTRY_REQUIRED)
+                            Object.values(row.output).includes(MANUAL_ENTRY_REQUIRED) ||
+                            row.carryForward.manualFieldsMissing.length > 0
                               ? "incompleteRow"
                               : undefined
                           }
@@ -1004,15 +1284,38 @@ export default function DashboardPage() {
                           <td className="changeCell">
                             <ChangeTypeBadge comparison={row.comparison} />
                           </td>
+                          <td className="opsCell">
+                            <CarryForwardBadge carryForward={row.carryForward} />
+                            {row.carryForward.manualFieldsMissing.length > 0 ? (
+                              <span
+                                className="manualCount"
+                                title={`Manual entry required: ${formatFieldList(row.carryForward.manualFieldsMissing)}`}
+                              >
+                                {row.carryForward.manualFieldsMissing.length}
+                              </span>
+                            ) : null}
+                          </td>
                           {DAILY_CALL_PLAN_COLUMNS.map((column) => {
                             const value = isEditing ? draftOutput[column] : row.output[column];
                             const isManualRequired = value === MANUAL_ENTRY_REQUIRED;
                             const isReadOnly = column === "S.no" || column === "Ticket ID";
+                            const manualField = MANUAL_FIELD_BY_COLUMN[column];
+                            const isCarriedForward =
+                              manualField
+                                ? row.carryForward.carriedForwardFields.includes(manualField)
+                                : false;
+                            const needsManualEntry =
+                              manualField
+                                ? row.carryForward.manualFieldsMissing.includes(manualField)
+                                : false;
 
                             return (
                               <td
                                 key={column}
-                                className={isManualRequired ? "missingCell" : undefined}
+                                className={[
+                                  isManualRequired || needsManualEntry ? "missingCell" : "",
+                                  isCarriedForward ? "carriedForwardCell" : "",
+                                ].filter(Boolean).join(" ") || undefined}
                                 onClick={
                                   !isEditing && isManualRequired && !isReadOnly
                                     ? () => startEditing(row)
@@ -1026,7 +1329,9 @@ export default function DashboardPage() {
                                 title={
                                   !isEditing && isManualRequired && !isReadOnly
                                     ? "Click to edit manual entry"
-                                    : undefined
+                                    : isCarriedForward
+                                      ? "Value carried from previous day"
+                                      : undefined
                                 }
                               >
                                 {isEditing && !isReadOnly ? (
@@ -1092,7 +1397,12 @@ export default function DashboardPage() {
                                     />
                                   )
                                 ) : (
-                                  String(value ?? "")
+                                  <span className="cellValueWrap">
+                                    <span>{String(value ?? "")}</span>
+                                    {isCarriedForward ? (
+                                      <span className="cellCarryFlag">Carried</span>
+                                    ) : null}
+                                  </span>
                                 )}
                               </td>
                             );
@@ -1100,12 +1410,17 @@ export default function DashboardPage() {
                           <td className="stickyActionColumn">
                             {isEditing ? (
                               <div className="rowActions">
-                                <button type="button" onClick={() => saveEditing(row.serialNo)}>
-                                  Save
+                                <button
+                                  type="button"
+                                  disabled={savingSerialNo === row.serialNo}
+                                  onClick={() => void saveEditing(row.serialNo)}
+                                >
+                                  {savingSerialNo === row.serialNo ? "Saving..." : "Save"}
                                 </button>
                                 <button
                                   type="button"
                                   className="secondaryButton"
+                                  disabled={savingSerialNo === row.serialNo}
                                   onClick={cancelEditing}
                                 >
                                   Cancel

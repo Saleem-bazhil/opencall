@@ -5,7 +5,7 @@ import type {
 
 export type UploadSourceType = "FLEX_WIP" | "RENDERWAYS" | "CALL_PLAN";
 
-export type DailyCallPlanSegment = "PC" | "Print" | "Install" | "";
+export type DailyCallPlanSegment = string;
 
 export interface DailyCallPlanRow {
   serialNo: number;

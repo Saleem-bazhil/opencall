@@ -2,11 +2,102 @@ import { DAILY_CALL_PLAN_COLUMNS } from "@opencall/shared";
 import type { GeneratedReportResponse } from "./apiClient";
 import * as XLSX from "xlsx";
 
-export function downloadReportAsExcel(report: GeneratedReportResponse): void {
-  // Build CSV content (works without any library)
-  const headers = ["Change Type", "Change Summary", ...DAILY_CALL_PLAN_COLUMNS];
+const MANUAL_ENTRY_REQUIRED = "Manual Entry Required";
 
-  const escapeCSV = (value: string | number | null | undefined): string => {
+const MANUAL_FIELD_LABELS: Record<string, string> = {
+  rtpl_status: "RTPL status",
+  segment: "Segment",
+  engineer: "Engineer",
+  location: "Location",
+  customer_mail: "Customer Mail",
+  rca: "RCA",
+};
+
+export const EXPORT_METADATA_COLUMNS = [
+  "Change Type",
+  "Change Summary",
+  "Carry Forward Status",
+  "Carried Forward Fields",
+  "Manual Fields Completed",
+  "Manual Fields Missing",
+  "Manual Entry Required Fields",
+  "Closed Synthetic Row",
+] as const;
+
+type ExportCellValue = string | number | boolean;
+
+function formatFieldList(fields: readonly string[]): string {
+  return fields
+    .map((field) => MANUAL_FIELD_LABELS[field] ?? field)
+    .join("; ");
+}
+
+function exportChangeType(
+  row: GeneratedReportResponse["rows"][number],
+): string {
+  return row.comparison?.changeType ?? row.carryForward.changeType ?? "";
+}
+
+function exportCarryForwardStatus(
+  row: GeneratedReportResponse["rows"][number],
+): string {
+  if (row.carryForward.closedSyntheticRow) {
+    return "CLOSED";
+  }
+
+  if (row.carryForward.carriedForwardFields.length > 0) {
+    return "CARRIED";
+  }
+
+  if (row.carryForward.changeType === "NEW_WORK_ORDER") {
+    return "NEW_WORK_ORDER";
+  }
+
+  if (row.carryForward.manualFieldsMissing.length > 0) {
+    return "MANUAL_ENTRY_REQUIRED";
+  }
+
+  return row.carryForward.manualFieldsCompleted ? "COMPLETE" : "";
+}
+
+function manualEntryRequiredColumns(
+  row: GeneratedReportResponse["rows"][number],
+): string {
+  const columns = DAILY_CALL_PLAN_COLUMNS.filter(
+    (column) => row.output[column] === MANUAL_ENTRY_REQUIRED,
+  );
+
+  return columns.join("; ");
+}
+
+export function buildReportExportMatrix(
+  report: GeneratedReportResponse,
+): ExportCellValue[][] {
+  const headers = [...EXPORT_METADATA_COLUMNS, ...DAILY_CALL_PLAN_COLUMNS];
+  const data: ExportCellValue[][] = [headers];
+
+  for (const row of report.rows) {
+    data.push([
+      exportChangeType(row),
+      row.comparison?.changeSummary ?? "",
+      exportCarryForwardStatus(row),
+      formatFieldList(row.carryForward.carriedForwardFields),
+      row.carryForward.manualFieldsCompleted ? "Yes" : "No",
+      formatFieldList(row.carryForward.manualFieldsMissing),
+      manualEntryRequiredColumns(row),
+      row.carryForward.closedSyntheticRow ? "Yes" : "No",
+      ...DAILY_CALL_PLAN_COLUMNS.map((col) => row.output[col] ?? ""),
+    ]);
+  }
+
+  return data;
+}
+
+export function downloadReportAsExcel(report: GeneratedReportResponse): void {
+  const data = buildReportExportMatrix(report);
+  const escapeCSV = (
+    value: string | number | boolean | null | undefined,
+  ): string => {
     const str = String(value ?? "");
     if (str.includes(",") || str.includes('"') || str.includes("\n")) {
       return `"${str.replace(/"/g, '""')}"`;
@@ -15,18 +106,11 @@ export function downloadReportAsExcel(report: GeneratedReportResponse): void {
   };
 
   const csvRows: string[] = [];
-  csvRows.push(headers.map(escapeCSV).join(","));
-
-  for (const row of report.rows) {
-    const values = [
-      escapeCSV(row.comparison?.changeType ?? ""),
-      escapeCSV(row.comparison?.changeSummary ?? ""),
-      ...DAILY_CALL_PLAN_COLUMNS.map((col) => escapeCSV(row.output[col])),
-    ];
-    csvRows.push(values.join(","));
+  for (const row of data) {
+    csvRows.push(row.map(escapeCSV).join(","));
   }
 
-  const csvContent = "\uFEFF" + csvRows.join("\r\n"); // BOM for Excel UTF-8
+  const csvContent = "\uFEFF" + csvRows.join("\r\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -41,20 +125,8 @@ export function downloadReportAsExcel(report: GeneratedReportResponse): void {
 }
 
 export function downloadReportAsXlsx(report: GeneratedReportResponse): void {
-  const headers = ["Change Type", "Change Summary", ...DAILY_CALL_PLAN_COLUMNS];
-
-  // Build a 2D array: headers + data rows
-  const data: (string | number)[][] = [];
-  data.push([...headers]);
-
-  for (const row of report.rows) {
-    const values = [
-      row.comparison?.changeType ?? "",
-      row.comparison?.changeSummary ?? "",
-      ...DAILY_CALL_PLAN_COLUMNS.map((col) => row.output[col] ?? ""),
-    ];
-    data.push(values);
-  }
+  const data = buildReportExportMatrix(report);
+  const headers = data[0] ?? [];
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
